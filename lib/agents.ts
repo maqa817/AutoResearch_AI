@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { callOllama, getConfig as getOllamaConfig } from "@/lib/ollama";
 import { plannerAgent } from "@/lib/agents/planner";
 import { researcherAgent } from "@/lib/agents/researcher";
@@ -19,15 +21,46 @@ export interface ResearchResult {
 }
 
 /**
- * Version 4: Simple query with Ollama (direct LLM call)
+ * Utility to load all files from the dataset directory
+ */
+function loadDatasetContext(): string {
+  const datasetDir = path.join(process.cwd(), "dataset");
+  let context = "";
+
+  if (!fs.existsSync(datasetDir)) return "";
+
+  try {
+    const files = fs.readdirSync(datasetDir);
+    for (const file of files) {
+      if (file.endsWith(".txt") || file.endsWith(".md")) {
+        const content = fs.readFileSync(path.join(datasetDir, file), "utf-8");
+        context += `\n--- FILE: ${file} ---\n${content}\n`;
+      }
+    }
+  } catch (err) {
+    console.error("[v0] Error reading dataset:", err);
+  }
+
+  return context;
+}
+
+/**
+ * Version 4: Simple query with Context
  */
 export async function simpleQuery(query: string): Promise<string> {
-  console.log("[v0] Running simple query with Ollama...");
+  const context = loadDatasetContext();
+  console.log(`[v0] Running simple query with ${context.length} chars of context...`);
 
-  const prompt = `Please provide a concise and helpful answer to this research query: "${query}"`;
+  const prompt = `You are a helpful AI assistant. Answer the query ONLY using the provided context. 
+  If the answer is not in the context, say "I cannot find this information in the provided documents."
+  
+  CONTEXT:
+  ${context || "No documents provided."}
+  
+  QUERY: "${query}"`;
+  
   const answer = await callOllama(prompt);
 
-  // Save to memory
   try {
     saveQuery({
       query,
@@ -44,14 +77,18 @@ export async function simpleQuery(query: string): Promise<string> {
 }
 
 /**
- * Version 4: Multi-agent orchestration with Critic Agent
+ * Version 4: Multi-agent orchestration with Context
  */
 export async function runMultiAgentResearch(query: string): Promise<ResearchResult> {
   const steps: AgentStep[] = [];
+  const context = loadDatasetContext();
+  
+  console.log(`[v0] Processing multi-agent request with ${context.length} chars of context...`);
 
   // Step 1: Planning
   console.log("[v0] Step 1: Planning");
-  const plan = await plannerAgent(query);
+  const planPrompt = `PLANNER: Break down this query into 3 research steps based ONLY on provided context.\nCONTEXT: ${context || "None"}\nQUERY: ${query}`;
+  const plan = await plannerAgent(planPrompt); 
   steps.push({
     agent: "Planner",
     input: query,
@@ -61,7 +98,8 @@ export async function runMultiAgentResearch(query: string): Promise<ResearchResu
 
   // Step 2: Researching
   console.log("[v0] Step 2: Researching");
-  const findings = await researcherAgent(plan);
+  const researchPrompt = `RESEARCHER: Gather findings from the context for this plan.\nCONTEXT: ${context || "None"}\nPLAN: ${plan}`;
+  const findings = await researcherAgent(researchPrompt);
   steps.push({
     agent: "Researcher",
     input: plan,
@@ -71,7 +109,8 @@ export async function runMultiAgentResearch(query: string): Promise<ResearchResu
 
   // Step 3: Writing
   console.log("[v0] Step 3: Writing");
-  const initialAnswer = await writerAgent(findings, query);
+  const writePrompt = `WRITER: Synthesize findings into a final answer. Use THE PROVIDED CONTEXT ONLY.\nCONTEXT: ${context || "None"}\nFINDINGS: ${findings}\nQUERY: ${query}`;
+  const initialAnswer = await writerAgent(writePrompt, query);
   steps.push({
     agent: "Writer",
     input: findings,
@@ -85,7 +124,7 @@ export async function runMultiAgentResearch(query: string): Promise<ResearchResu
   steps.push({
     agent: "Critic",
     input: initialAnswer,
-    output: `Quality: ${criticism.quality}\nHallucinations: ${criticism.hallucinations.length > 0 ? criticism.hallucinations.join(", ") : "None"}\nSuggestions: ${criticism.suggestions.join(", ")}`,
+    output: `Quality: ${criticism.quality}\nSuggestions: ${criticism.suggestions.join(", ")}`,
     timestamp: new Date().toISOString(),
   });
 
@@ -93,8 +132,8 @@ export async function runMultiAgentResearch(query: string): Promise<ResearchResu
 
   // Step 5: Rewrite if needed
   if (criticism.shouldRegenerate) {
-    console.log("[v0] Step 5: Regenerating answer based on criticism...");
-    const improvementPrompt = `The previous answer had these issues:\n${criticism.suggestions.join("\n")}\n\nPlease provide an improved answer to the query: "${query}"`;
+    console.log("[v0] Step 5: Regenerating based on criticism...");
+    const improvementPrompt = `IMPROVE: The previous answer had issues. Rewrite it using CONTEXT ONLY.\nCONTEXT: ${context || "None"}\nISSUE: ${criticism.suggestions.join("\n")}\nQUERY: ${query}`;
     finalAnswer = await callOllama(improvementPrompt);
     steps.push({
       agent: "Writer (Revised)",

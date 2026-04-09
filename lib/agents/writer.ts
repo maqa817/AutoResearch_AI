@@ -1,19 +1,7 @@
 import { callOllama } from "@/lib/ollama";
 
-export async function writerAgent(
-  findings: string,
-  originalQuery: string
-): Promise<string> {
+export async function writerAgent(prompt: string, originalQuery: string): Promise<string> {
   console.log("[v0] Running Writer Agent...");
-
-  const prompt = `You are a Research Writer. Based on the following research findings, write a professional and concise final answer to the original query.
-
-ORIGINAL QUERY: "${originalQuery}"
-
-FINDINGS:
-${findings}
-
-Write a well-structured answer that is clear and authoritative.`;
 
   try {
     const response = await callOllama(prompt);
