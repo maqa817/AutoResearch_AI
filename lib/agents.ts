@@ -1,9 +1,9 @@
-import { callOllama } from "@/lib/ollama";
+import { callOllama, getConfig as getOllamaConfig } from "@/lib/ollama";
 import { plannerAgent } from "@/lib/agents/planner";
 import { researcherAgent } from "@/lib/agents/researcher";
 import { writerAgent } from "@/lib/agents/writer";
 import { criticAgent, type CriticReview } from "@/lib/agents/critic";
-import { saveQuery, getConfig as getOllamaConfig } from "@/lib/memory";
+import { saveQuery } from "@/lib/memory";
 
 export interface AgentStep {
   agent: string;
