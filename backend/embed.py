@@ -10,6 +10,7 @@ import hashlib
 from typing import List, Tuple, Dict
 from pathlib import Path
 import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer
 import faiss
 
@@ -27,7 +28,10 @@ class EmbeddingManager:
     
     def __init__(self):
         """Initialize embedding model and load/create FAISS index"""
-        self.model = SentenceTransformer(MODEL_NAME)
+        # Explicitly detect and assign the GPU if available (specifically for RTX series)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Initializing Embedding Engine on device: {self.device.upper()}")
+        self.model = SentenceTransformer(MODEL_NAME, device=self.device)
         self.index = None
         self.metadata = {}
         self.embeddings_cache = {}
