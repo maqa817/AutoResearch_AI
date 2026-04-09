@@ -122,8 +122,61 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans relative">
       
+      {/* Settings Modal Overlay */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card w-full max-w-md border border-border rounded-2xl subtle-shadow overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-border flex justify-between items-center bg-secondary/30">
+                <div className="flex items-center gap-3">
+                  <SlidersHorizontal className="w-5 h-5 text-primary" />
+                  <h3 className="font-bold text-lg">System Configuration</h3>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowSettings(false)} className="w-8 h-8 rounded-full">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3 block">Inference Engine</label>
+                  <div className="p-3 border border-border rounded-lg bg-secondary/50 text-sm font-medium flex justify-between items-center">
+                    <span>Ollama Local Runtime</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3 block">GPU Orchestration</label>
+                  <div className="p-3 border border-primary/30 rounded-lg bg-primary/5 text-sm font-medium text-primary">
+                    RTX 4060 Ti Memory Allocation Active
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                    num_gpu layers are fully offloaded to VRAM logic arrays. Maximum context window bounded to 4096 tokens.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-3 block">Embedding Model</label>
+                  <div className="p-3 border border-border rounded-lg bg-secondary/50 text-sm font-medium">
+                    all-MiniLM-L6-v2 (Hardware Accelerated)
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 bg-secondary/30 mt-auto border-t border-border">
+                <Button className="w-full bg-foreground text-background font-bold rounded-lg hover:-translate-y-0.5 transition-transform" onClick={() => setShowSettings(false)}>
+                  Acknowledge & Close
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Top Navigation Bar */}
       <header className="h-16 border-b border-border bg-background sticky top-0 z-40">
         <div className="max-w-[1400px] mx-auto px-6 h-full flex items-center justify-between">
