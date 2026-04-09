@@ -28,49 +28,36 @@ class RAGPipeline:
         self.model = model
         self.chunk_count = 3  # Number of chunks to retrieve
     
-    def _retrieve_context(self, query: str) -> str:
+    def _retrieve_context(self, query: str, doc_ids: List[str] = None) -> str:
         """
         Retrieve relevant chunks and format as context
-        
-        Args:
-            query: User query
-        
-        Returns:
-            Formatted context string
         """
-        chunks = retrieve_relevant_chunks(query, top_k=self.chunk_count)
+        chunks = retrieve_relevant_chunks(query, top_k=self.chunk_count, doc_ids=doc_ids)
         
         if not chunks:
-            return "[No relevant documents found]"
+            return "[No relevant documents found in the selected files]"
         
         context = "RELEVANT DOCUMENTS:\n\n"
         for i, chunk in enumerate(chunks, 1):
             score = chunk.get("similarity_score", 0)
-            context += f"[Document {i} - Relevance: {score:.2f}]\n"
-            context += f"{chunk['text'][:500]}...\n\n"  # Limit to first 500 chars
+            context += f"[Document {i} - Relevance: {score:.2f} - ID: {chunk['doc_id']}]\n"
+            context += f"{chunk['text'][:500]}...\n\n" 
         
         return context
     
     def _build_prompt(self, query: str, context: str) -> str:
         """
         Build prompt with context for LLM
-        
-        Args:
-            query: User's question
-            context: Retrieved context
-        
-        Returns:
-            Complete prompt
         """
-        prompt = f"""You are an expert research assistant analyzing documents.
+        prompt = f"""You are an expert research assistant analyzing specific user-selected documents.
 
 {context}
 
 INSTRUCTIONS:
-- Answer ONLY based on the provided documents
-- If information is not in the documents, say "This information is not available in the provided documents"
-- Be concise and accurate
-- Cite which document you're referencing when relevant
+- Answer ONLY based on the provided documents listed above.
+- If the answer is not in these specific documents, say "I cannot find this information in the selected files."
+- Do NOT use outside knowledge or mention files that are not in the context.
+- Cite which document ID you're referencing.
 
 USER QUESTION: {query}
 
@@ -81,12 +68,6 @@ ANSWER:"""
     def _call_ollama(self, prompt: str) -> Optional[str]:
         """
         Call Ollama API for inference
-        
-        Args:
-            prompt: Complete prompt
-        
-        Returns:
-            Generated response or None if error
         """
         try:
             url = f"{self.ollama_base_url}/api/generate"
@@ -95,7 +76,7 @@ ANSWER:"""
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
-                "temperature": 0.3,  # Lower temperature for consistency
+                "temperature": 0.1,  # Critical: lower temperature reduces hallucinations
             }
             
             response = requests.post(url, json=payload, timeout=120)
@@ -105,24 +86,16 @@ ANSWER:"""
             return result.get("response", "").strip()
         
         except requests.exceptions.ConnectionError:
-            return "ERROR: Cannot connect to Ollama. Is it running? (ollama serve)"
-        except requests.exceptions.Timeout:
-            return "ERROR: Ollama request timed out. Model may still be loading."
+            return "ERROR: Cannot connect to Ollama. Is it running?"
         except Exception as e:
             return f"ERROR: {str(e)}"
     
-    def generate(self, query: str) -> Dict:
+    def generate(self, query: str, doc_ids: List[str] = None) -> Dict:
         """
-        Generate response using RAG pipeline
-        
-        Args:
-            query: User's question
-        
-        Returns:
-            Dict with answer, context, and metadata
+        Generate response using RAG pipeline with optional doc filtering
         """
         # Step 1: Retrieve relevant context
-        context = self._retrieve_context(query)
+        context = self._retrieve_context(query, doc_ids=doc_ids)
         
         # Step 2: Build prompt
         prompt = self._build_prompt(query, context)
@@ -138,16 +111,10 @@ ANSWER:"""
             "model": self.model,
             "chunks_retrieved": self.chunk_count
         }
-    
+
     def batch_generate(self, queries: List[str]) -> List[Dict]:
         """
         Generate responses for multiple queries
-        
-        Args:
-            queries: List of questions
-        
-        Returns:
-            List of results
         """
         results = []
         for query in queries:
@@ -173,76 +140,50 @@ class ResearchOrchestrator:
     def plan_research(self, query: str) -> List[str]:
         """Planner: Break down research question"""
         planner_prompt = f"""Given the question: "{query}"
-        
-Create a research plan with 3-4 specific steps to investigate.
+Create a research plan with 3 specific steps to investigate based ONLY on the selected documents.
 Return as a numbered list."""
         
         plan_text = self.rag._call_ollama(planner_prompt)
         return plan_text.split('\n') if plan_text else []
     
-    def conduct_research(self, query: str) -> str:
-        """Researcher: Find relevant information"""
-        return self.rag.generate(query)["answer"]
+    def conduct_research(self, query: str, doc_ids: List[str] = None) -> str:
+        """Researcher: Find relevant information in specific files"""
+        return self.rag.generate(query, doc_ids=doc_ids)["answer"]
     
     def analyze_findings(self, findings: str) -> str:
         """Analyst: Synthesize and identify patterns"""
-        analysis_prompt = f"""Based on these research findings:
-
+        analysis_prompt = f"""Analyze these findings found in the selected documents:
 {findings}
 
-Provide a structured analysis identifying:
-1. Key findings
-2. Important patterns
-3. Areas of uncertainty
-4. Recommended conclusions"""
-        
+Identify key patterns and conclusions."""
         return self.rag._call_ollama(analysis_prompt)
     
     def write_report(self, query: str, analysis: str) -> str:
-        """Writer: Generate comprehensive report"""
-        report_prompt = f"""Write a professional research report on: {query}
-
-Based on this analysis:
-{analysis}
-
-Structure the report with:
-- Executive Summary
-- Key Findings
-- Analysis
-- Conclusions
-- Recommendations"""
-        
+        """Writer: Generate final answer"""
+        report_prompt = f"""Write a concise answer to: {query}
+Using this analysis of the documents:
+{analysis}"""
         return self.rag._call_ollama(report_prompt)
     
     def critique_output(self, report: str) -> Dict:
-        """Critic: Review for quality and accuracy"""
-        critique_prompt = f"""Review this research report for quality:
-
+        """Critic Agent"""
+        critique_prompt = f"""Review this answer for accuracy against the source:
 {report}
-
-Provide feedback on:
-1. Accuracy and factuality
-2. Completeness
-3. Clarity and structure
-4. Areas for improvement
-5. Overall quality score (1-10)"""
-        
+Is it good, fair, or poor?"""
         feedback = self.rag._call_ollama(critique_prompt)
-        
         return {
             "feedback": feedback,
-            "quality_pass": "Quality score: 8" in feedback or "Quality score: 9" in feedback or "Quality score: 10" in feedback
+            "quality_pass": "good" in feedback.lower()
         }
     
-    def orchestrate_full_research(self, query: str) -> Dict:
+    def orchestrate_full_research(self, query: str, doc_ids: List[str] = None) -> Dict:
         """
         Run complete multi-agent research workflow, matching the Next.js frontend structure.
         """
-        import time
         from datetime import datetime
         
         print(f"\n{'='*60}")
-        print("STARTING FASTAPI MULTI-AGENT ORCHESTRATION")
+        print(f"STARTING ORCHESTRATION ON {len(doc_ids) if doc_ids else 'ALL'} FILES")
         print(f"Query: {query}")
         print(f"{'='*60}\n")
         
@@ -260,8 +201,8 @@ Provide feedback on:
         })
         
         # Step 2: Research
-        print("2. RESEARCHER AGENT...")
-        research_str = self.conduct_research(query)
+        print(f"2. RESEARCHER AGENT (Targeting {doc_ids})...")
+        research_str = self.conduct_research(query, doc_ids=doc_ids)
         steps.append({
             "agent": "Researcher",
             "input": plan_text,
@@ -299,33 +240,17 @@ Provide feedback on:
             "timestamp": datetime.now().isoformat()
         })
         
-        # Format the critic feedback for the UI
         quality_str = 'fair'
-        if critique_res['quality_pass'] or "Quality score: 9" in critique_res['feedback'] or "Quality score: 10" in critique_res['feedback']:
-            quality_str = 'good'
-        elif "Quality score: 1" in critique_res['feedback'] or "Quality score: 2" in critique_res['feedback']:
-            quality_str = 'poor'
+        if critique_res['quality_pass']: quality_str = 'good'
 
         criticism = {
             "quality": quality_str,
             "hallucinations": [],
-            "suggestions": ["Consider adding more metrics", "Verify sources if generic"] if quality_str != 'good' else [],
+            "suggestions": [],
             "shouldRegenerate": quality_str == 'poor'
         }
         
-        # Optional Step 6: Rewrite if poor
         finalAnswer = report_str
-        if criticism["shouldRegenerate"]:
-            print("REGENERATING BASED ON CRITIC...")
-            improvement_prompt = f"Improve this report based on critique: {report_str}\n\nCritique:\n{critique_res['feedback']}"
-            finalAnswer = self.rag._call_ollama(improvement_prompt)
-            steps.append({
-                "agent": "Writer (Revised)",
-                "input": improvement_prompt,
-                "output": finalAnswer, 
-                "timestamp": datetime.now().isoformat()
-            })
-
         print("FASTAPI ORCHESTRATION COMPLETE\n")
         
         return {
@@ -343,11 +268,11 @@ rag_pipeline = RAGPipeline()
 research_orchestrator = ResearchOrchestrator()
 
 
-def generate_with_rag(query: str) -> Dict:
-    """Simple RAG generation"""
-    return rag_pipeline.generate(query)
+def generate_with_rag(query: str, doc_ids: List[str] = None) -> Dict:
+    """Simple RAG generation with doc filtering"""
+    return rag_pipeline.generate(query, doc_ids=doc_ids)
 
 
-def run_full_research(query: str) -> Dict:
-    """Run full multi-agent research"""
-    return research_orchestrator.orchestrate_full_research(query)
+def run_full_research(query: str, doc_ids: List[str] = None) -> Dict:
+    """Run full multi-agent research with doc filtering"""
+    return research_orchestrator.orchestrate_full_research(query, doc_ids=doc_ids)

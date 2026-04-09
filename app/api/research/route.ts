@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     // Convert to FastAPI expected format
     const fastApiRequest = {
       query: query,
-      use_full_orchestration: useFullOrchestration || false
+      use_full_orchestration: useFullOrchestration || false,
+      selected_documents: (documents || []).map((name: string) => name.replace('.', '_').replace('/', '_'))
     };
 
     const fastApiResponse = await fetch(fastApiUrl, {

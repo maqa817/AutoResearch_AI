@@ -171,16 +171,9 @@ class EmbeddingManager:
         print(f"Added {len(chunks)} chunks from document {doc_id}")
         return len(chunks)
     
-    def query(self, query_text: str, top_k: int = 3) -> List[Dict]:
+    def query(self, query_text: str, top_k: int = 3, doc_ids: List[str] = None) -> List[Dict]:
         """
-        Retrieve top-k most relevant chunks for a query
-        
-        Args:
-            query_text: User's query
-            top_k: Number of chunks to retrieve (default: 3)
-        
-        Returns:
-            List of relevant chunks with text and metadata
+        Retrieve top-k most relevant chunks for a query, optionally filtered by doc_ids
         """
         if len(self.metadata.get("chunks", [])) == 0:
             print("No documents indexed yet")
@@ -189,21 +182,30 @@ class EmbeddingManager:
         # Embed query
         query_embedding = self.model.encode([query_text])[0].astype('float32').reshape(1, -1)
         
-        # Search FAISS index
-        distances, indices = self.index.search(query_embedding, min(top_k, len(self.metadata["chunks"])))
+        # Search FAISS index (search more than top_k initially to allow for filtering)
+        search_k = max(top_k * 5, 50) 
+        distances, indices = self.index.search(query_embedding, min(search_k, len(self.metadata["chunks"])))
         
-        # Retrieve chunks
+        # Retrieve and Filter chunks
         results = []
         for idx, distance in zip(indices[0], distances[0]):
             if idx < len(self.metadata["chunks"]):
                 chunk_meta = self.metadata["chunks"][idx]
+                
+                # STRICT FILTER: Only include if doc_id matches selected documents
+                if doc_ids and chunk_meta["doc_id"] not in doc_ids:
+                    continue
+                    
                 results.append({
                     "text": chunk_meta["text"],
                     "doc_id": chunk_meta["doc_id"],
                     "chunk_id": chunk_meta["chunk_id"],
-                    "similarity_score": 1 / (1 + float(distance)),  # Convert distance to similarity
+                    "similarity_score": 1 / (1 + float(distance)),
                     "word_count": chunk_meta["word_count"]
                 })
+                
+                if len(results) >= top_k:
+                    break
         
         return results
     
@@ -244,9 +246,9 @@ def embed_and_add_document(text: str, doc_id: str, metadata: Dict = None) -> int
     return embedding_manager.add_document(text, doc_id, metadata)
 
 
-def retrieve_relevant_chunks(query: str, top_k: int = 3) -> List[Dict]:
-    """Utility function to retrieve chunks"""
-    return embedding_manager.query(query, top_k)
+def retrieve_relevant_chunks(query: str, top_k: int = 3, doc_ids: List[str] = None) -> List[Dict]:
+    """Utility function to retrieve chunks with doc filtering"""
+    return embedding_manager.query(query, top_k, doc_ids)
 
 
 def get_embedding_stats() -> Dict:

@@ -42,6 +42,7 @@ class QueryRequest(BaseModel):
     """Request model for research queries"""
     query: str
     use_full_orchestration: bool = False  # Use all 5 agents vs simple RAG
+    selected_documents: Optional[List[str]] = None  # Specific doc_ids to search
 
 class SimpleRAGResponse(BaseModel):
     """Response for simple RAG query"""
@@ -157,10 +158,13 @@ async def research_query(request: QueryRequest):
     2. full_orchestration: Multi-agent workflow
     """
     try:
+        # Extract selected doc_ids for filtering
+        doc_ids = request.selected_documents
+        
         if request.use_full_orchestration:
             # Full multi-agent workflow
-            logger.info(f"Starting full research orchestration for: {request.query}")
-            result = run_full_research(request.query)
+            logger.info(f"Starting full research orchestration for: {request.query} (Files: {doc_ids})")
+            result = run_full_research(request.query, doc_ids=doc_ids)
             
             # Ensure we return the full schema expected by Next.js
             return {
@@ -173,8 +177,8 @@ async def research_query(request: QueryRequest):
             }
         else:
             # Simple RAG
-            logger.info(f"Starting RAG query for: {request.query}")
-            result = generate_with_rag(request.query)
+            logger.info(f"Starting simple RAG for: {request.query} (Files: {doc_ids})")
+            result = generate_with_rag(request.query, doc_ids=doc_ids)
             return {
                 "query": request.query,
                 "answer": result["answer"],
