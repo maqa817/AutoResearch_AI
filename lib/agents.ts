@@ -1,11 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-// Initialize Anthropic client
-// In production, this would use process.env.ANTHROPIC_API_KEY
-// For local debugging, we'll look for it in env
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || "mock-key",
-});
+import { callOllama } from "@/lib/ollama";
+import { plannerAgent } from "@/lib/agents/planner";
+import { researcherAgent } from "@/lib/agents/researcher";
+import { writerAgent } from "@/lib/agents/writer";
+import { criticAgent, type CriticReview } from "@/lib/agents/critic";
+import { saveQuery, getConfig as getOllamaConfig } from "@/lib/memory";
 
 export interface AgentStep {
   agent: string;
@@ -14,113 +12,45 @@ export interface AgentStep {
   timestamp: string;
 }
 
+export interface ResearchResult {
+  steps: AgentStep[];
+  finalAnswer: string;
+  criticism?: CriticReview;
+}
+
 /**
- * Version 1 & 3: Simple query (direct LLM call)
+ * Version 4: Simple query with Ollama (direct LLM call)
  */
 export async function simpleQuery(query: string): Promise<string> {
-  console.log("[v0] Running simple query...");
-  
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1024,
-      messages: [
-        { role: "user", content: `Please provide a concise and helpful answer to this research query: "${query}"` }
-      ],
-    });
+  console.log("[v0] Running simple query with Ollama...");
 
-    return (response.content[0] as any).text;
+  const prompt = `Please provide a concise and helpful answer to this research query: "${query}"`;
+  const answer = await callOllama(prompt);
+
+  // Save to memory
+  try {
+    saveQuery({
+      query,
+      answer,
+      agent_steps: JSON.stringify([]),
+      quality: "simple",
+      model_config: JSON.stringify(getOllamaConfig()),
+    });
   } catch (error) {
-    console.error("[v0] Simple query error:", error);
-    if (process.env.ANTHROPIC_API_KEY === "mock-key" || !process.env.ANTHROPIC_API_KEY) {
-      return `[DEBUG MODE] This is a mock response for: "${query}". Please set ANTHROPIC_API_KEY in .env.local for real processing.`;
-    }
-    throw error;
+    console.error("[v0] Failed to save query:", error);
   }
+
+  return answer;
 }
 
 /**
- * Planner Agent: Breaks down a research query into steps
+ * Version 4: Multi-agent orchestration with Critic Agent
  */
-async function plannerAgent(query: string): Promise<string> {
-  console.log("[v0] Running Planner Agent...");
-  
-  const prompt = `You are a Research Planner. Break down the following research query into 3 clear, actionable research steps.
-  
-  QUERY: "${query}"
-  
-  Provide only the 3 steps in a numbered list.`;
-
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return (response.content[0] as any).text;
-  } catch (error) {
-    return "1. Analyze primary query components\n2. Gather supporting evidence and data\n3. Identify cross-functional patterns";
-  }
-}
-
-/**
- * Researcher Agent: Analyzes a research plan and gathers findings
- */
-async function researcherAgent(plan: string): Promise<string> {
-  console.log("[v0] Running Researcher Agent...");
-  
-  const prompt = `You are a Researcher. Based on the following research plan, provide detailed findings and data points for each step.
-  
-  PLAN:
-  ${plan}
-  
-  Provide comprehensive findings.`;
-
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return (response.content[0] as any).text;
-  } catch (error) {
-    return "The research indicates strong correlation between variables. Historical data suggests a 15% increase in efficiency when applying multi-agent patterns. Market analysis shows growing demand for automated research systems.";
-  }
-}
-
-/**
- * Writer Agent: Synthesizes findings into a final report
- */
-async function writerAgent(findings: string, originalQuery: string): Promise<string> {
-  console.log("[v0] Running Writer Agent...");
-  
-  const prompt = `You are a Research Writer. Based on the following research findings, write a professional and comprehensive final answer to the original query.
-  
-  ORIGINAL QUERY: "${originalQuery}"
-  FINDINGS:
-  ${findings}
-  
-  Ensure the final answer is well-structured and authoritative.`;
-
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return (response.content[0] as any).text;
-  } catch (error) {
-    return `Analysis for "${originalQuery}":\n\nBased on the synthesized research findings, it is clear that automated research systems provide significant advantages in scalability and depth. The multi-agent approach allows for complex tasks to be distributed across specialized units, resulting in more accurate and comprehensive insights.`;
-  }
-}
-
-/**
- * Orchestrator: Runs the full multi-agent workflow
- */
-export async function runMultiAgentResearch(query: string): Promise<{ steps: AgentStep[], finalAnswer: string }> {
+export async function runMultiAgentResearch(query: string): Promise<ResearchResult> {
   const steps: AgentStep[] = [];
-  
+
   // Step 1: Planning
+  console.log("[v0] Step 1: Planning");
   const plan = await plannerAgent(query);
   steps.push({
     agent: "Planner",
@@ -130,6 +60,7 @@ export async function runMultiAgentResearch(query: string): Promise<{ steps: Age
   });
 
   // Step 2: Researching
+  console.log("[v0] Step 2: Researching");
   const findings = await researcherAgent(plan);
   steps.push({
     agent: "Researcher",
@@ -139,16 +70,56 @@ export async function runMultiAgentResearch(query: string): Promise<{ steps: Age
   });
 
   // Step 3: Writing
-  const finalAnswer = await writerAgent(findings, query);
+  console.log("[v0] Step 3: Writing");
+  const initialAnswer = await writerAgent(findings, query);
   steps.push({
     agent: "Writer",
     input: findings,
-    output: finalAnswer,
+    output: initialAnswer,
     timestamp: new Date().toISOString(),
   });
+
+  // Step 4: Critic Review
+  console.log("[v0] Step 4: Critic Review");
+  const criticism = await criticAgent(initialAnswer, query);
+  steps.push({
+    agent: "Critic",
+    input: initialAnswer,
+    output: `Quality: ${criticism.quality}\nHallucinations: ${criticism.hallucinations.length > 0 ? criticism.hallucinations.join(", ") : "None"}\nSuggestions: ${criticism.suggestions.join(", ")}`,
+    timestamp: new Date().toISOString(),
+  });
+
+  let finalAnswer = initialAnswer;
+
+  // Step 5: Rewrite if needed
+  if (criticism.shouldRegenerate) {
+    console.log("[v0] Step 5: Regenerating answer based on criticism...");
+    const improvementPrompt = `The previous answer had these issues:\n${criticism.suggestions.join("\n")}\n\nPlease provide an improved answer to the query: "${query}"`;
+    finalAnswer = await callOllama(improvementPrompt);
+    steps.push({
+      agent: "Writer (Revised)",
+      input: improvementPrompt,
+      output: finalAnswer,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Save to memory
+  try {
+    saveQuery({
+      query,
+      answer: finalAnswer,
+      agent_steps: JSON.stringify(steps),
+      quality: criticism.quality,
+      model_config: JSON.stringify(getOllamaConfig()),
+    });
+  } catch (error) {
+    console.error("[v0] Failed to save query:", error);
+  }
 
   return {
     steps,
     finalAnswer,
+    criticism,
   };
 }

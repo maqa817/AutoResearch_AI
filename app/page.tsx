@@ -155,8 +155,8 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-slate-700 bg-slate-900/50 py-8 text-center text-slate-400">
-        <p>AutoResearch AI v3.0 - Version 3: Multi-Agent Orchestration (Planner → Researcher → Writer)</p>
-        <p className="text-sm mt-2">Vercel-Ready | Next.js 16 | AI SDK v6</p>
+        <p>AutoResearch AI v4.0 - Version 4: Full System with Critic Agent, Memory & Config</p>
+        <p className="text-sm mt-2">Multi-Agent: Planner → Researcher → Writer → Critic | Ollama Integration | Configurable Parameters</p>
       </footer>
     </div>
   );
