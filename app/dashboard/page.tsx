@@ -2,12 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  Loader2, Send, Sparkles, Zap, Upload, FileText, 
-  Settings, Trash2, BrainCircuit, X, History, 
-  Search, ShieldCheck, Cpu, ArrowLeft
+  Loader2, Send, Sparkles, Upload, FileText, 
+  Settings, Trash2, BrainCircuit, X, 
+  Search, ShieldCheck, Cpu, ArrowLeft,
+  ChevronRight, AlignLeft, BarChart2, MessageSquare,
+  AlertCircle, CheckCircle2, SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -35,13 +37,12 @@ export default function Dashboard() {
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [criticism, setCriticism] = useState<CriticReview | null>(null);
   const [error, setError] = useState('');
+  
+  // Settings
   const [useFullOrchestration, setUseFullOrchestration] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Stats
-  const [temperature, setTemperature] = useState(0.7);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -59,23 +60,18 @@ export default function Dashboard() {
     }
   };
 
-  const removeDocument = (index: number) => {
-    setDocuments(documents.filter((_, i) => i !== index));
-  };
+  const removeDocument = (index: number) => setDocuments(documents.filter((_, i) => i !== index));
 
   const purgeSystem = async () => {
-    if (confirm('Are you sure you want to clear system memory?')) {
+    if (confirm('Clear working memory? This will purge the index.')) {
       await fetch('http://localhost:8000/api/clear-index', { method: 'POST' });
-      setDocuments([]);
-      setResponse('');
-      setAgentSteps([]);
-      setError('');
+      setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) { setError('Please enter a research objective'); return; }
+    if (!query.trim()) { setError('Research parameters missing.'); return; }
     setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null);
     try {
       const res = await fetch('/api/research', {
@@ -83,7 +79,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, useFullOrchestration, documents: documents.map(d => d.name) }),
       });
-      if (!res.ok) throw new Error('System processing error');
+      if (!res.ok) throw new Error('Inference failure. Check backend.');
       const data = await res.json();
       if (useFullOrchestration && data.steps) {
         setAgentSteps(data.steps); setResponse(data.finalAnswer); setCriticism(data.criticism || null);
@@ -93,185 +89,270 @@ export default function Dashboard() {
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
+  // Helper for agent icons
+  const getAgentIcon = (name: string) => {
+    if (name.includes('Planner')) return <AlignLeft className="w-4 h-4" />;
+    if (name.includes('Researcher')) return <Search className="w-4 h-4" />;
+    if (name.includes('Analyst')) return <BarChart2 className="w-4 h-4" />;
+    if (name.includes('Writer')) return <MessageSquare className="w-4 h-4" />;
+    if (name.includes('Critic')) return <ShieldCheck className="w-4 h-4" />;
+    return <Cpu className="w-4 h-4" />;
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Precision Header */}
-      <header className="h-16 border-b border-border/40 bg-background/50 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-xs font-bold tracking-widest uppercase opacity-40">Return</span>
-          </Link>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-3">
-            <div className="bg-primary p-1.5 rounded-md text-primary-foreground">
-              <Sparkles className="w-4 h-4" />
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+      
+      {/* Top Navigation Bar */}
+      <header className="h-16 border-b border-border bg-background sticky top-0 z-40">
+        <div className="max-w-[1400px] mx-auto px-6 h-full flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group">
+              <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center group-hover:-translate-x-1 transition-transform">
+                <ArrowLeft className="w-4 h-4" />
+              </div>
+            </Link>
+            <div className="flex items-center gap-3">
+              <span className="font-bold tracking-tight text-[15px]">Studio Dashboard</span>
+              <span className="px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[11px] font-bold tracking-wider uppercase">Local Enclave</span>
             </div>
-            <h1 className="text-sm font-bold tracking-tighter uppercase whitespace-nowrap">Studio Workspace</h1>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-4 mr-4 text-[10px] uppercase tracking-widest font-bold opacity-30">
-            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Encrypted</span>
-            <span className="flex items-center gap-1.5"><Cpu className="w-3 h-3" /> Local</span>
+          
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <div className="h-4 w-px bg-border mx-1" />
+            <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} className="w-10 h-10 rounded-full">
+              <SlidersHorizontal className="w-[18px] h-[18px]" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={purgeSystem} className="w-10 h-10 rounded-full text-destructive hover:bg-destructive/10">
+              <Trash2 className="w-[18px] h-[18px]" />
+            </Button>
           </div>
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} className="rounded-full">
-            <Settings className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={purgeSystem} className="rounded-full text-destructive hover:bg-destructive/10">
-            <Trash2 className="w-4 h-4" />
-          </Button>
         </div>
       </header>
 
-      {/* Workspace Grid */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-12">
+      {/* Main Workspace */}
+      <main className="flex-1 w-full max-w-[1400px] mx-auto p-6 md:p-8 lg:p-12 mb-20">
         
-        {/* Input Column */}
-        <aside className="lg:col-span-4 space-y-8">
-          <section className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/60 px-1">Objective</h2>
-            <Card className="border-border/40 bg-secondary/20 luxury-shadow rounded-3xl overflow-hidden">
-              <CardContent className="p-1">
-                <Textarea
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Define your research parameters..."
-                  className="border-none bg-transparent focus-visible:ring-0 text-base placeholder:opacity-30 p-6 resize-none min-h-[160px]"
-                />
+        {/* Workspace Title Area */}
+        <div className="mb-12 flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2">Research Configuration</h1>
+            <p className="text-muted-foreground text-lg">Define parameters and establish context vectors.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          
+          {/* Left Column: Form Controls */}
+          <div className="lg:col-span-4 space-y-8">
+            <div className="space-y-3">
+              <label className="text-sm font-bold tracking-tight uppercase text-muted-foreground">Primary Objective</label>
+              <Textarea
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="E.g., Analyze the performance difference between FAISS and ChromaDB in local environments..."
+                className="w-full min-h-[160px] p-5 rounded-xl border-border bg-card text-[15px] resize-none focus:ring-primary focus:border-primary subtle-shadow transition-all"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold tracking-tight uppercase text-muted-foreground">Context Sources</label>
+                <span className="text-xs bg-secondary px-2 rounded-full font-medium">{documents.length} Files</span>
+              </div>
+              <div className="p-1 rounded-xl bg-card border border-border subtle-shadow">
+                <input ref={fileInputRef} type="file" multiple accept=".pdf,.txt,.md" onChange={handleFileUpload} className="hidden" />
+                <Button 
+                  variant="ghost" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full h-14 rounded-lg border border-dashed border-border hover:bg-secondary/50 text-muted-foreground transition-all flex items-center justify-center gap-2"
+                >
+                  {isUploading ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Upload className="w-5 h-5" />}
+                  {isUploading ? 'Vectorizing...' : 'Upload Reference Documents'}
+                </Button>
+
+                <AnimatePresence>
+                  {documents.length > 0 && (
+                    <div className="p-2 space-y-2 mt-2 border-t border-border/50">
+                      {documents.map((doc, i) => (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                          key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 text-sm overflow-hidden group"
+                        >
+                          <div className="flex items-center gap-3 truncate">
+                            <FileText className="w-4 h-4 text-primary shrink-0" />
+                            <span className="truncate">{doc.name}</span>
+                          </div>
+                          <button onClick={() => removeDocument(i)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-all">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Orchestration Toggle */}
+            <div 
+              onClick={() => setUseFullOrchestration(!useFullOrchestration)}
+              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${
+                useFullOrchestration ? 'bg-primary/5 border-primary/30' : 'bg-card border-border hover:bg-secondary/50'
+              }`}
+            >
+              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                useFullOrchestration ? 'bg-primary border-primary text-primary-foreground' : 'bg-transparent border-border'
+              }`}>
+                {useFullOrchestration && <CheckCircle2 className="w-3.5 h-3.5" />}
+              </div>
+              <div>
+                <p className="font-bold text-base mb-1">Agentic Pipeline</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">Engages Planner, Researcher, Analyst, and Critic models iteratively.</p>
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading} 
+              className="w-full h-16 rounded-xl text-[16px] font-bold bg-foreground text-background hover:bg-foreground/90 transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_30px_rgba(255,255,255,0.1)] px-8"
+            >
+              {loading ? (
+                <span className="flex items-center gap-3"><Loader2 className="w-5 h-5 animate-spin" /> Core active...</span>
+              ) : (
+                <span className="flex items-center gap-3">Commence Analysis <ArrowRight className="w-5 h-5" /></span>
+              )}
+            </Button>
+
+            <AnimatePresence>
+              {error && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive flex gap-3 text-sm font-medium">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <p>{error}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+          </div>
+
+          {/* Right Column: Dynamic Trace & Results */}
+          <div className="lg:col-span-8 space-y-8 flex flex-col">
+
+            {/* Trace Timeline */}
+            <AnimatePresence>
+              {agentSteps.length > 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
+                  <div className="border-b border-border mb-6 pb-2 flex justify-between items-end">
+                    <h3 className="text-sm font-bold uppercase tracking-widest">Inference Trace</h3>
+                    <span className="text-[12px] font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full">{agentSteps.length} Agents</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {agentSteps.map((step, i) => (
+                      <Card key={i} className="bg-card border-border subtle-shadow rounded-xl overflow-hidden hover:-translate-y-1 transition-transform group">
+                        <CardHeader className="py-3 px-4 bg-secondary/30 border-b border-border/50 flex flex-row items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getAgentIcon(step.agent)}
+                            <span className="font-bold text-sm tracking-wide">{step.agent}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-medium">{new Date(step.timestamp).toLocaleTimeString()}</span>
+                        </CardHeader>
+                        <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground h-[100px] overflow-hidden relative">
+                          <div className="relative z-10">{step.output.substring(0, 150)}...</div>
+                          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent z-20" />
+                          <div className="absolute inset-0 bg-secondary/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30 cursor-pointer">
+                            <span className="bg-background px-3 py-1.5 rounded-full shadow border border-border font-bold text-foreground">View Detail</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Quality Critic Box */}
+            <AnimatePresence>
+              {criticism && (
+                <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="mb-6">
+                  <Card className={`rounded-xl border ${
+                    criticism.quality === 'good' ? 'border-[#34D399]/30 bg-[#34D399]/5' :
+                    criticism.quality === 'fair' ? 'border-[#F59E0B]/30 bg-[#F59E0B]/5' : 'border-destructive/30 bg-destructive/5'
+                  }`}>
+                    <CardContent className="p-5 flex flex-col md:flex-row gap-6">
+                      <div className="flex flex-col gap-2 min-w-[200px]">
+                        <span className="text-[10px] uppercase font-bold tracking-widest opacity-60">Verification Layer</span>
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className={`w-5 h-5 ${criticism.quality === 'good' ? 'text-[#34D399]' : 'text-[#F59E0B]'}`} />
+                          <span className="text-xl font-black capitalize">{criticism.quality} Result</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-4">
+                        {criticism.hallucinations?.length > 0 && (
+                          <div>
+                            <span className="text-[11px] font-bold uppercase text-destructive tracking-wider mb-2 block">Detected Anomalies</span>
+                            {criticism.hallucinations.map((h, i) => (
+                              <div key={i} className="text-sm bg-background/50 border border-border/50 p-2 rounded mb-1">{h}</div>
+                            ))}
+                          </div>
+                        )}
+                        {criticism.suggestions?.length > 0 && (
+                          <div>
+                            <span className="text-[11px] font-bold uppercase text-primary tracking-wider mb-2 block">Synthesis Suggestions</span>
+                            {criticism.suggestions.map((s, i) => (
+                              <div key={i} className="text-sm bg-background/50 border border-border/50 p-2 rounded mb-1">{s}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Final Render Output */}
+            <Card className="flex-1 bg-card border-border rounded-2xl subtle-shadow flex flex-col overflow-hidden min-h-[500px]">
+              <CardHeader className="bg-secondary/30 px-8 py-5 border-b border-border flex flex-row items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-3">
+                  <BrainCircuit className="w-6 h-6 text-primary" />
+                  Synthesis Report
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${loading ? 'bg-[#F59E0B] animate-pulse' : response ? 'bg-[#34D399]' : 'bg-muted-foreground'}`} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {loading ? 'Processing' : response ? 'Complete' : 'Standby'}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 flex-1 flex flex-col">
+                {!response && !loading ? (
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-30">
+                    <Sparkles className="w-16 h-16 mb-6 stroke-1" />
+                    <p className="font-bold tracking-[0.2em] uppercase text-sm">System Ready</p>
+                  </div>
+                ) : (
+                  <div className="prose dark:prose-invert prose-p:leading-relaxed prose-headings:font-bold prose-headings:tracking-tight max-w-none text-[15px]">
+                    {loading && !response ? (
+                      <div className="space-y-4 opacity-60">
+                        <div className="w-1/3 h-8 bg-secondary rounded animate-pulse mb-8" />
+                        <div className="w-full h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-[95%] h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-[85%] h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-2/3 h-4 bg-secondary rounded animate-pulse" />
+                      </div>
+                    ) : (
+                      <div className="animate-in fade-in duration-700" dangerouslySetInnerHTML={{ __html: response.replace(/\n\n/g, '</p><p>').replace(/\n(.*)/g, '<br/>$1').replace(/^/, '<p>').concat('</p>') }} />
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </section>
 
-          <section className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/60 px-1">Sources</h2>
-            <div className="space-y-3">
-              <input ref={fileInputRef} type="file" multiple accept=".pdf,.txt" onChange={handleFileUpload} className="hidden" />
-              <Button 
-                variant="outline" 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full h-12 rounded-2xl border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground"
-              >
-                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                {isUploading ? 'Vectorizing...' : 'Attach Reference Documents'}
-              </Button>
-
-              <AnimatePresence>
-                {documents.map((doc, i) => (
-                  <motion.div 
-                    key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center justify-between p-3 bg-secondary/40 border border-border/20 rounded-xl"
-                  >
-                    <span className="text-xs font-medium truncate flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5 opacity-50" /> {doc.name}
-                    </span>
-                    <button onClick={() => removeDocument(i)} className="p-1 hover:text-destructive opacity-40 hover:opacity-100 transition-all">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </section>
-
-          <div className="pt-4 space-y-4">
-            <div className="flex items-center transition-all bg-secondary/20 p-4 rounded-3xl border border-border/10 cursor-pointer hover:bg-secondary/40"
-                 onClick={() => setUseFullOrchestration(!useFullOrchestration)}>
-              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${useFullOrchestration ? 'bg-primary border-primary' : 'border-border'}`}>
-                {useFullOrchestration && <ShieldCheck className="w-3 h-3 text-primary-foreground" />}
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-bold tracking-tight">Agentic Orchestration</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-0.5 opacity-60">Planner • Researcher • Critic</p>
-              </div>
-            </div>
-
-            <Button disabled={loading} onClick={handleSubmit} className="w-full h-14 rounded-3xl font-bold text-base transition-all active:scale-95 luxury-shadow">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2">Execute Analysis <Zap className="w-4 h-4" /></span>}
-            </Button>
           </div>
-        </aside>
-
-        {/* Output Column */}
-        <div className="lg:col-span-8 flex flex-col gap-8">
-          
-          <Card className="flex-1 min-h-[500px] border-border/40 bg-background luxury-shadow rounded-[2.5rem] flex flex-col overflow-hidden relative">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-            <CardHeader className="p-8 pb-0">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl font-bold tracking-tighter">Research Synthesis</CardTitle>
-                <div className="px-3 py-1 bg-secondary rounded-full text-[10px] font-bold uppercase tracking-widest opacity-60">Status: {loading ? 'Computing' : 'Idle'}</div>
-              </div>
-              <CardDescription className="text-sm mt-2 opacity-50">Local agentic inference on provided source material.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-8 flex-1 flex flex-col">
-              {!response && !loading ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground/30 py-20">
-                  <Cpu className="w-20 h-20 mb-6 stroke-[0.5]" />
-                  <p className="text-xs uppercase tracking-[0.3em] font-bold">Awaiting Operational Signal</p>
-                </div>
-              ) : (
-                <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-base leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-700">
-                  {loading && !response ? (
-                    <div className="space-y-6">
-                      <div className="h-4 bg-secondary animate-pulse rounded w-3/4" />
-                      <div className="h-4 bg-secondary animate-pulse rounded w-full" />
-                      <div className="h-4 bg-secondary animate-pulse rounded w-1/2" />
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap">{response}</div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Trace Logs (Minimalistic Footer) */}
-          <AnimatePresence>
-            {agentSteps.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 px-8">Orchestration Log</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4 pb-8">
-                  {agentSteps.map((step, i) => (
-                    <div key={i} className="p-4 bg-secondary/20 border border-border/40 rounded-2xl flex flex-col gap-3 group hover:bg-secondary/40 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-primary uppercase tracking-[0.1em]">{step.agent}</span>
-                        <Search className="w-3 h-3 opacity-20" />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3 font-medium italic opacity-70 group-hover:opacity-100 italic transition-all">
-                        {step.output}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
-
       </main>
 
-      {/* Global Error Popups */}
-      {error && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-5 duration-300">
-          <Card className="bg-destructive text-destructive-foreground border-none px-6 py-3 rounded-2xl luxury-shadow flex items-center gap-3">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-sm font-bold tracking-tight">{error}</span>
-            <button onClick={() => setError('')} className="ml-2 opacity-50 hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
-          </Card>
-        </div>
-      )}
     </div>
-  );
-}
-
-function AlertCircle(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle">
-      <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
-    </svg>
   );
 }
