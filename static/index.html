@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Q&A System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        #questionInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        #questionInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #submitBtn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #submitBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #submitBtn:active {
+            transform: translateY(0);
+        }
+
+        #submitBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .response-section {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .response-section.show {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .question-display {
+            background: #f5f5f5;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            border-left: 4px solid #667eea;
+        }
+
+        .question-display label {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .question-display p {
+            color: #333;
+            font-size: 16px;
+        }
+
+        .answer-display {
+            background: #f0f7ff;
+            padding: 16px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .answer-display label {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336 !important;
+            color: #c62828;
+        }
+
+        .status-message {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .status-message.success {
+            background: #f1f8e9;
+            color: #33691e;
+        }
+
+        .status-message.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .input-section {
+                flex-direction: column;
+            }
+
+            #submitBtn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Local AI Q&A</h1>
+        <p class="subtitle">Ask a question based on the dataset</p>
+
+        <div class="input-section">
+            <input
+                type="text"
+                id="questionInput"
+                placeholder="Enter your question here..."
+                autocomplete="off"
+            />
+            <button id="submitBtn">Ask</button>
+        </div>
+
+        <div id="responseSection" class="response-section">
+            <div class="question-display">
+                <label>Question</label>
+                <p id="displayQuestion"></p>
+            </div>
+
+            <div id="answerDisplay" class="answer-display">
+                <label>Answer</label>
+                <p id="displayAnswer"></p>
+            </div>
+        </div>
+
+        <div id="statusMessage" class="status-message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const questionInput = document.getElementById('questionInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const responseSection = document.getElementById('responseSection');
+        const answerDisplay = document.getElementById('answerDisplay');
+        const displayQuestion = document.getElementById('displayQuestion');
+        const displayAnswer = document.getElementById('displayAnswer');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Submit on button click
+        submitBtn.addEventListener('click', askQuestion);
+
+        // Submit on Enter key
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !submitBtn.disabled) {
+                askQuestion();
+            }
+        });
+
+        async function askQuestion() {
+            const question = questionInput.value.trim();
+
+            if (!question) {
+                showStatus('Please enter a question', 'error');
+                return;
+            }
+
+            // Disable input and button
+            submitBtn.disabled = true;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner"></span>Asking...';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Display response
+                displayQuestion.textContent = data.question;
+                displayAnswer.textContent = data.answer;
+                answerDisplay.classList.remove('error');
+
+                // Check if answer contains error
+                if (data.answer.includes('Error') || data.answer.includes('Cannot')) {
+                    answerDisplay.classList.add('error');
+                }
+
+                responseSection.classList.add('show');
+                showStatus('Answer generated successfully', 'success');
+
+            } catch (error) {
+                displayAnswer.textContent = `Error: ${error.message}. Make sure the backend is running on http://localhost:8000`;
+                answerDisplay.classList.add('error');
+                responseSection.classList.add('show');
+                showStatus('Failed to get answer', 'error');
+            } finally {
+                // Re-enable input and button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message ${type}`;
+            statusMessage.style.display = 'block';
+
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
