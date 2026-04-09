@@ -9,7 +9,7 @@ export const defaultConfig: OllamaConfig = {
   temperature: 0.7,
   max_tokens: 1024,
   top_k: 40,
-  model: "llama2", // Default model - adjust based on your Ollama setup
+  model: "mistral", // Updated: matches your local setup
 };
 
 let currentConfig: OllamaConfig = { ...defaultConfig };
