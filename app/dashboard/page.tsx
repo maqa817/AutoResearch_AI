@@ -2,12 +2,12 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Loader2, Send, Sparkles, Upload, FileText, 
   Settings, Trash2, BrainCircuit, X, 
-  Search, ShieldCheck, Cpu, ArrowLeft,
+  Search, ShieldCheck, Cpu, ArrowLeft, ArrowRight,
   ChevronRight, AlignLeft, BarChart2, MessageSquare,
   AlertCircle, CheckCircle2, SlidersHorizontal
 } from 'lucide-react';
