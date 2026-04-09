@@ -43,6 +43,7 @@ export async function callOllama(prompt: string, customConfig?: Partial<OllamaCo
         top_k: config.top_k,
         stream: false,
       }),
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
     if (!response.ok) {

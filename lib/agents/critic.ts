@@ -48,23 +48,35 @@ function parseReview(response: string): CriticReview {
 
   for (const line of lines) {
     if (line.includes("QUALITY:")) {
-      const quality = line.split(":")[1].trim().toLowerCase();
-      if (["good", "fair", "poor"].includes(quality)) {
-        review.quality = quality as any;
+      const parts = line.split(":");
+      if (parts.length > 1) {
+        const quality = parts[1].trim().toLowerCase();
+        if (["good", "fair", "poor"].includes(quality)) {
+          review.quality = quality as any;
+        }
       }
     } else if (line.includes("HALLUCINATIONS:")) {
-      const hals = line.split(":")[1].trim();
-      if (hals !== "None" && hals) {
-        review.hallucinations.push(hals);
+      const parts = line.split(":");
+      if (parts.length > 1) {
+        const hals = parts[1].trim();
+        if (hals !== "None" && hals) {
+          review.hallucinations.push(hals);
+        }
       }
     } else if (line.includes("SUGGESTIONS:")) {
-      const sugg = line.split(":")[1].trim();
-      if (sugg) {
-        review.suggestions.push(sugg);
+      const parts = line.split(":");
+      if (parts.length > 1) {
+        const sugg = parts[1].trim();
+        if (sugg) {
+          review.suggestions.push(sugg);
+        }
       }
     } else if (line.includes("REGENERATE:")) {
-      const regen = line.split(":")[1].trim().toLowerCase();
-      review.shouldRegenerate = regen === "yes" || regen === "true";
+      const parts = line.split(":");
+      if (parts.length > 1) {
+        const regen = parts[1].trim().toLowerCase();
+        review.shouldRegenerate = regen === "yes" || regen === "true";
+      }
     }
   }
 
