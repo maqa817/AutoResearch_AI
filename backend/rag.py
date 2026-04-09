@@ -76,7 +76,11 @@ ANSWER:"""
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
-                "temperature": 0.1,  # Critical: lower temperature reduces hallucinations
+                "options": {
+                    "temperature": 0.1,  # Critical: lower temperature reduces hallucinations
+                    "num_gpu": 99,       # Forces Ollama to dump 100% of LLM layers onto the GPU (RTX 4060 Ti)
+                    "num_ctx": 4096      # Prevents memory bleeding to CPU RAM
+                }
             }
             
             response = requests.post(url, json=payload, timeout=120)
