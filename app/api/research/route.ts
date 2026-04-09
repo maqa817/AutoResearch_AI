@@ -40,27 +40,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("[v0] Processing research request:", {
+    // Proxy research queries to the Python FastAPI backend
+    console.log("[v5] Proxying request to FastAPI backend...", {
       query: query.substring(0, 50) + "...",
       fullOrchestration: useFullOrchestration,
-      documentsCount: documents?.length || 0,
     });
 
-    if (useFullOrchestration) {
-      // Version 4: Full multi-agent orchestration with Critic
-      console.log("[v0] Running full multi-agent orchestration");
-      const result = await runMultiAgentResearch(query);
-      return NextResponse.json(result);
-    } else {
-      // Simple query mode
-      console.log("[v0] Running simple query");
-      const answer = await simpleQuery(query);
-      return NextResponse.json({
-        query,
-        answer,
-        mode: "simple",
-      });
+    const fastApiUrl = "http://127.0.0.1:8000/api/research";
+    
+    // Convert to FastAPI expected format
+    const fastApiRequest = {
+      query: query,
+      use_full_orchestration: useFullOrchestration || false
+    };
+
+    const fastApiResponse = await fetch(fastApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fastApiRequest),
+    });
+
+    if (!fastApiResponse.ok) {
+      throw new Error(`FastAPI returned status ${fastApiResponse.status}`);
     }
+
+    const data = await fastApiResponse.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error("[v0] API error:", error);
     return NextResponse.json(

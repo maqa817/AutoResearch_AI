@@ -236,58 +236,105 @@ Provide feedback on:
     
     def orchestrate_full_research(self, query: str) -> Dict:
         """
-        Run complete multi-agent research workflow
-        
-        Agents:
-        1. Planner: Creates research plan
-        2. Researcher: Retrieves relevant information
-        3. Analyst: Synthesizes findings
-        4. Writer: Generates report
-        5. Critic: Reviews output
+        Run complete multi-agent research workflow, matching the Next.js frontend structure.
         """
+        import time
+        from datetime import datetime
+        
         print(f"\n{'='*60}")
-        print("STARTING MULTI-AGENT RESEARCH ORCHESTRATION")
+        print("STARTING FASTAPI MULTI-AGENT ORCHESTRATION")
         print(f"Query: {query}")
         print(f"{'='*60}\n")
         
-        results = {}
+        steps = []
         
         # Step 1: Planning
-        print("1. PLANNER AGENT: Creating research plan...")
-        results["plan"] = self.plan_research(query)
-        print(f"   Plan created with {len(results['plan'])} steps\n")
+        print("1. PLANNER AGENT...")
+        plan_list = self.plan_research(query)
+        plan_text = "\n".join(plan_list)
+        steps.append({
+            "agent": "Planner",
+            "input": query,
+            "output": plan_text,
+            "timestamp": datetime.now().isoformat()
+        })
         
         # Step 2: Research
-        print("2. RESEARCHER AGENT: Conducting research...")
-        research_result = self.conduct_research(query)
-        results["research"] = research_result
-        print(f"   Found relevant information\n")
+        print("2. RESEARCHER AGENT...")
+        research_str = self.conduct_research(query)
+        steps.append({
+            "agent": "Researcher",
+            "input": plan_text,
+            "output": research_str,
+            "timestamp": datetime.now().isoformat()
+        })
         
         # Step 3: Analysis
-        print("3. ANALYST AGENT: Analyzing findings...")
-        results["analysis"] = self.analyze_findings(research_result)
-        print(f"   Analysis complete\n")
+        print("3. ANALYST AGENT...")
+        analysis_str = self.analyze_findings(research_str)
+        steps.append({
+            "agent": "Analyst",
+            "input": research_str,
+            "output": analysis_str,
+            "timestamp": datetime.now().isoformat()
+        })
         
         # Step 4: Writing
-        print("4. WRITER AGENT: Generating report...")
-        results["report"] = self.write_report(query, results["analysis"])
-        print(f"   Report generated\n")
+        print("4. WRITER AGENT...")
+        report_str = self.write_report(query, analysis_str)
+        steps.append({
+            "agent": "Writer",
+            "input": analysis_str,
+            "output": report_str,
+            "timestamp": datetime.now().isoformat()
+        })
         
         # Step 5: Critique
-        print("5. CRITIC AGENT: Reviewing quality...")
-        results["critique"] = self.critique_output(results["report"])
-        print(f"   Quality review complete\n")
+        print("5. CRITIC AGENT...")
+        critique_res = self.critique_output(report_str)
+        steps.append({
+            "agent": "Critic",
+            "input": report_str,
+            "output": critique_res["feedback"],
+            "timestamp": datetime.now().isoformat()
+        })
         
-        print(f"{'='*60}")
-        print("RESEARCH ORCHESTRATION COMPLETE")
-        print(f"{'='*60}\n")
+        # Format the critic feedback for the UI
+        quality_str = 'fair'
+        if critique_res['quality_pass'] or "Quality score: 9" in critique_res['feedback'] or "Quality score: 10" in critique_res['feedback']:
+            quality_str = 'good'
+        elif "Quality score: 1" in critique_res['feedback'] or "Quality score: 2" in critique_res['feedback']:
+            quality_str = 'poor'
+
+        criticism = {
+            "quality": quality_str,
+            "hallucinations": [],
+            "suggestions": ["Consider adding more metrics", "Verify sources if generic"] if quality_str != 'good' else [],
+            "shouldRegenerate": quality_str == 'poor'
+        }
+        
+        # Optional Step 6: Rewrite if poor
+        finalAnswer = report_str
+        if criticism["shouldRegenerate"]:
+            print("REGENERATING BASED ON CRITIC...")
+            improvement_prompt = f"Improve this report based on critique: {report_str}\n\nCritique:\n{critique_res['feedback']}"
+            finalAnswer = self.rag._call_ollama(improvement_prompt)
+            steps.append({
+                "agent": "Writer (Revised)",
+                "input": improvement_prompt,
+                "output": finalAnswer, 
+                "timestamp": datetime.now().isoformat()
+            })
+
+        print("FASTAPI ORCHESTRATION COMPLETE\n")
         
         return {
             "query": query,
+            "answer": finalAnswer,      
+            "finalAnswer": finalAnswer, 
             "status": "completed",
-            "agents_involved": ["Planner", "Researcher", "Analyst", "Writer", "Critic"],
-            "results": results,
-            "final_report": results["report"]
+            "steps": steps,             
+            "criticism": criticism      
         }
 
 

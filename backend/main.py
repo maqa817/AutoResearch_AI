@@ -161,12 +161,15 @@ async def research_query(request: QueryRequest):
             # Full multi-agent workflow
             logger.info(f"Starting full research orchestration for: {request.query}")
             result = run_full_research(request.query)
+            
+            # Ensure we return the full schema expected by Next.js
             return {
                 "query": request.query,
                 "status": result["status"],
-                "agents_involved": result["agents_involved"],
-                "final_report": result["final_report"],
-                "mode": "full_orchestration"
+                "mode": "full_orchestration",
+                "finalAnswer": result.get("finalAnswer", ""),
+                "steps": result.get("steps", []),
+                "criticism": result.get("criticism", None)
             }
         else:
             # Simple RAG

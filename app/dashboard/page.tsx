@@ -36,9 +36,24 @@ export default function Dashboard() {
   const [topK, setTopK] = useState(40);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setDocuments([...documents, ...files]);
+    
+    // Automatically upload to FastAPI backend
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        await fetch('http://localhost:8000/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (err) {
+        console.error('Failed to upload file to index:', file.name, err);
+      }
+    }
   };
 
   const removeDocument = (index: number) => {
