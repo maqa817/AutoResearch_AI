@@ -27,8 +27,8 @@ export default function Home() {
           
           <div className="hidden md:flex items-center gap-8 font-medium">
             <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</Link>
-            <Link href="#workflow" className="text-muted-foreground hover:text-foreground transition-colors">Workflow</Link>
-            <Link href="#security" className="text-muted-foreground hover:text-foreground transition-colors">Security</Link>
+            <Link href="/workflow" className="text-muted-foreground hover:text-foreground transition-colors">Workflow</Link>
+            <Link href="/security" className="text-muted-foreground hover:text-foreground transition-colors">Security</Link>
           </div>
 
           <div className="flex items-center gap-4">
@@ -85,10 +85,6 @@ export default function Home() {
                 Launch Workspace <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
-            <Button variant="outline" className="w-full sm:w-auto rounded-lg h-14 px-8 text-base font-medium border-border hover:bg-secondary transition-all">
-              <Play className="w-5 h-5 mr-3 fill-foreground" />
-              Watch Demo
-            </Button>
           </motion.div>
         </section>
 
@@ -190,9 +186,8 @@ export default function Home() {
         <div className="max-w-[1400px] mx-auto mt-20 pt-8 border-t border-[#333333] text-[13px] opacity-60 flex flex-col md:flex-row justify-between items-center">
           <p>© 2026 AutoResearch AI Studio. All rights reserved.</p>
           <div className="flex gap-6 mt-4 md:mt-0">
-            <Link href="#" className="hover:text-white transition-colors">GitHub</Link>
-            <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
-            <Link href="#" className="hover:text-white transition-colors">LinkedIn</Link>
+            <Link href="https://github.com/maqa817" target="_blank" className="hover:text-white transition-colors">GitHub</Link>
+            <Link href="https://www.linkedin.com/in/maqa-verdiyev/" target="_blank" className="hover:text-white transition-colors">LinkedIn</Link>
           </div>
         </div>
       </footer>

@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  Loader2, Send, Sparkles, Upload, FileText, 
-  Settings, Trash2, BrainCircuit, X, 
+  Loader2, Sparkles, Upload, FileText, 
+  Trash2, BrainCircuit, X, 
   Search, ShieldCheck, Cpu, ArrowLeft, ArrowRight,
-  ChevronRight, AlignLeft, BarChart2, MessageSquare,
+  AlignLeft, BarChart2, MessageSquare,
   AlertCircle, CheckCircle2, SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,10 +29,21 @@ interface CriticReview {
   shouldRegenerate: boolean;
 }
 
+const LOADING_MESSAGES = [
+  "Initializing Swarm Intelligence...",
+  "Planner partitioning logical boundaries...",
+  "Running Deep Researcher against FAISS...",
+  "Analyst establishing metadata mapping...",
+  "Writer structuring document output...",
+  "Critic verifying hallucination metrics...",
+  "Finalizing executive synthesis..."
+];
+
 export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [documents, setDocuments] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [response, setResponse] = useState('');
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [criticism, setCriticism] = useState<CriticReview | null>(null);
@@ -43,6 +54,18 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      interval = setInterval(() => {
+        setLoadingMsgIdx((prev) => (prev + 1) % LOADING_MESSAGES.length);
+      }, 4000); // cycle message every 4 seconds
+    } else {
+      setLoadingMsgIdx(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -89,7 +112,6 @@ export default function Dashboard() {
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
-  // Helper for agent icons
   const getAgentIcon = (name: string) => {
     if (name.includes('Planner')) return <AlignLeft className="w-4 h-4" />;
     if (name.includes('Researcher')) return <Search className="w-4 h-4" />;
@@ -216,10 +238,10 @@ export default function Dashboard() {
             <Button 
               onClick={handleSubmit} 
               disabled={loading} 
-              className="w-full h-16 rounded-xl text-[16px] font-bold bg-foreground text-background hover:bg-foreground/90 transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_30px_rgba(255,255,255,0.1)] px-8"
+              className="w-full h-16 rounded-xl text-[16px] font-bold bg-foreground text-background hover:bg-foreground/90 transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-8"
             >
               {loading ? (
-                <span className="flex items-center gap-3"><Loader2 className="w-5 h-5 animate-spin" /> Core active...</span>
+                <span className="flex items-center gap-3"><Loader2 className="w-5 h-5 animate-spin" /> {LOADING_MESSAGES[loadingMsgIdx]}</span>
               ) : (
                 <span className="flex items-center gap-3">Commence Analysis <ArrowRight className="w-5 h-5" /></span>
               )}
@@ -239,42 +261,53 @@ export default function Dashboard() {
           {/* Right Column: Dynamic Trace & Results */}
           <div className="lg:col-span-8 space-y-8 flex flex-col">
 
-            {/* Trace Timeline */}
-            <AnimatePresence>
-              {agentSteps.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                  <div className="border-b border-border mb-6 pb-2 flex justify-between items-end">
-                    <h3 className="text-sm font-bold uppercase tracking-widest">Inference Trace</h3>
-                    <span className="text-[12px] font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full">{agentSteps.length} Agents</span>
+            {/* UP TOP: Final Render Output per User Request */}
+            <Card className="bg-card border-border rounded-2xl subtle-shadow flex flex-col overflow-hidden min-h-[500px]">
+              <CardHeader className="bg-secondary/30 px-8 py-5 border-b border-border flex flex-row items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-3">
+                  <BrainCircuit className="w-6 h-6 text-primary" />
+                  Synthesis Report
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${loading ? 'bg-[#F59E0B] animate-pulse' : response ? 'bg-[#34D399]' : 'bg-muted-foreground'}`} />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {loading ? 'Processing' : response ? 'Complete' : 'Standby'}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 flex-1 flex flex-col relative min-h-[400px]">
+                {!response && !loading ? (
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-30 absolute inset-0">
+                    <Sparkles className="w-16 h-16 mb-6 stroke-1" />
+                    <p className="font-bold tracking-[0.2em] uppercase text-sm">System Ready</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {agentSteps.map((step, i) => (
-                      <Card key={i} className="bg-card border-border subtle-shadow rounded-xl overflow-hidden hover:-translate-y-1 transition-transform group">
-                        <CardHeader className="py-3 px-4 bg-secondary/30 border-b border-border/50 flex flex-row items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {getAgentIcon(step.agent)}
-                            <span className="font-bold text-sm tracking-wide">{step.agent}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground font-medium">{new Date(step.timestamp).toLocaleTimeString()}</span>
-                        </CardHeader>
-                        <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground h-[100px] overflow-hidden relative">
-                          <div className="relative z-10">{step.output.substring(0, 150)}...</div>
-                          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent z-20" />
-                          <div className="absolute inset-0 bg-secondary/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30 cursor-pointer">
-                            <span className="bg-background px-3 py-1.5 rounded-full shadow border border-border font-bold text-foreground">View Detail</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                ) : (
+                  <div className="prose dark:prose-invert prose-p:leading-relaxed prose-headings:font-bold prose-headings:tracking-tight max-w-none text-[15px] z-10 w-full">
+                    {loading && !response ? (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 opacity-60">
+                         {/* We can show the loading state directly inside here too for double immersion */}
+                        <div className="w-1/3 h-8 bg-secondary rounded animate-pulse mb-8" />
+                        <div className="w-full h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-[95%] h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-[85%] h-4 bg-secondary rounded animate-pulse" />
+                        <div className="w-2/3 h-4 bg-secondary rounded animate-pulse" />
+                        
+                        <div className="mt-16 text-center text-sm font-bold text-primary animate-pulse">
+                          {LOADING_MESSAGES[loadingMsgIdx]}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="animate-in fade-in duration-700" dangerouslySetInnerHTML={{ __html: response.replace(/\n\n/g, '</p><p>').replace(/\n(.*)/g, '<br/>$1').replace(/^/, '<p>').concat('</p>') }} />
+                    )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </CardContent>
+            </Card>
 
-            {/* Quality Critic Box */}
+            {/* BOTTOM: Quality Critic Box */}
             <AnimatePresence>
               {criticism && (
-                <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="mb-6">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   <Card className={`rounded-xl border ${
                     criticism.quality === 'good' ? 'border-[#34D399]/30 bg-[#34D399]/5' :
                     criticism.quality === 'fair' ? 'border-[#F59E0B]/30 bg-[#F59E0B]/5' : 'border-destructive/30 bg-destructive/5'
@@ -311,43 +344,33 @@ export default function Dashboard() {
               )}
             </AnimatePresence>
 
-            {/* Final Render Output */}
-            <Card className="flex-1 bg-card border-border rounded-2xl subtle-shadow flex flex-col overflow-hidden min-h-[500px]">
-              <CardHeader className="bg-secondary/30 px-8 py-5 border-b border-border flex flex-row items-center justify-between">
-                <CardTitle className="text-xl font-bold flex items-center gap-3">
-                  <BrainCircuit className="w-6 h-6 text-primary" />
-                  Synthesis Report
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${loading ? 'bg-[#F59E0B] animate-pulse' : response ? 'bg-[#34D399]' : 'bg-muted-foreground'}`} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {loading ? 'Processing' : response ? 'Complete' : 'Standby'}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="p-8 flex-1 flex flex-col">
-                {!response && !loading ? (
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-30">
-                    <Sparkles className="w-16 h-16 mb-6 stroke-1" />
-                    <p className="font-bold tracking-[0.2em] uppercase text-sm">System Ready</p>
+            {/* BOTTOM: Trace Timeline details */}
+            <AnimatePresence>
+              {agentSteps.length > 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4">
+                  <div className="border-b border-border mb-6 pb-2 flex justify-between items-end">
+                    <h3 className="text-sm font-bold uppercase tracking-widest">Inference Details Backtrace</h3>
+                    <span className="text-[12px] font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full">{agentSteps.length} Operations</span>
                   </div>
-                ) : (
-                  <div className="prose dark:prose-invert prose-p:leading-relaxed prose-headings:font-bold prose-headings:tracking-tight max-w-none text-[15px]">
-                    {loading && !response ? (
-                      <div className="space-y-4 opacity-60">
-                        <div className="w-1/3 h-8 bg-secondary rounded animate-pulse mb-8" />
-                        <div className="w-full h-4 bg-secondary rounded animate-pulse" />
-                        <div className="w-[95%] h-4 bg-secondary rounded animate-pulse" />
-                        <div className="w-[85%] h-4 bg-secondary rounded animate-pulse" />
-                        <div className="w-2/3 h-4 bg-secondary rounded animate-pulse" />
-                      </div>
-                    ) : (
-                      <div className="animate-in fade-in duration-700" dangerouslySetInnerHTML={{ __html: response.replace(/\n\n/g, '</p><p>').replace(/\n(.*)/g, '<br/>$1').replace(/^/, '<p>').concat('</p>') }} />
-                    )}
+                  <div className="grid grid-cols-1 gap-4">
+                    {agentSteps.map((step, i) => (
+                      <Card key={i} className="bg-card border-border subtle-shadow rounded-xl overflow-hidden">
+                        <CardHeader className="py-3 px-4 bg-secondary/30 border-b border-border/50 flex flex-row items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getAgentIcon(step.agent)}
+                            <span className="font-bold text-sm tracking-wide">{step.agent}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-medium">{new Date(step.timestamp).toLocaleTimeString()}</span>
+                        </CardHeader>
+                        <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground max-h-[160px] overflow-y-auto custom-scrollbar whitespace-pre-wrap">
+                          {step.output}
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </div>
         </div>
