@@ -6,7 +6,7 @@ Integrates document retrieval with LLM inference
 from typing import List, Dict, Optional
 import requests
 from embed import retrieve_relevant_chunks, embedding_manager
-
+from tools import web_search, format_web_results_as_context
 
 class RAGPipeline:
     """
@@ -49,15 +49,15 @@ class RAGPipeline:
         """
         Build prompt with context for LLM
         """
-        prompt = f"""You are an expert research assistant analyzing specific user-selected documents.
+        prompt = f"""You are an expert research assistant.
 
 {context}
 
 INSTRUCTIONS:
-- Answer ONLY based on the provided documents listed above.
-- If the answer is not in these specific documents, say "I cannot find this information in the selected files."
+- Answer ONLY based on the provided documents and web search results listed above.
+- If the answer is not in this context, say "I cannot find this information in the provided context."
 - Do NOT use outside knowledge or mention files that are not in the context.
-- Cite which document ID you're referencing.
+- Cite your sources where possible.
 
 USER QUESTION: {query}
 
@@ -94,26 +94,37 @@ ANSWER:"""
         except Exception as e:
             return f"ERROR: {str(e)}"
     
-    def generate(self, query: str, doc_ids: List[str] = None) -> Dict:
+    def generate(self, query: str, doc_ids: List[str] = None, use_web: bool = False) -> Dict:
         """
-        Generate response using RAG pipeline with optional doc filtering
+        Generate response using RAG pipeline with optional doc filtering and web search
         """
-        # Step 1: Retrieve relevant context
-        context = self._retrieve_context(query, doc_ids=doc_ids)
+        # Step 1: Retrieve relevant context from local files
+        local_context = self._retrieve_context(query, doc_ids=doc_ids)
         
-        # Step 2: Build prompt
-        prompt = self._build_prompt(query, context)
+        # Step 2: Retrieve web context if requested
+        web_context = ""
+        if use_web:
+            results = web_search(query)
+            web_context = format_web_results_as_context(results)
+            
+        full_context = local_context + "\n" + web_context
         
-        # Step 3: Generate response
+        # Step 3: Build prompt
+        prompt = self._build_prompt(query, full_context)
+        
+        # Step 4: Generate response
         answer = self._call_ollama(prompt)
         
-        # Step 4: Return structured result
+        # Step 5: Return structured result
         return {
             "query": query,
             "answer": answer,
-            "context_used": context,
+            "context_used": full_context,
+            "local_context": local_context,
+            "web_context": web_context,
             "model": self.model,
-            "chunks_retrieved": self.chunk_count
+            "chunks_retrieved": self.chunk_count,
+            "web_results_used": use_web
         }
 
     def batch_generate(self, queries: List[str]) -> List[Dict]:
@@ -150,9 +161,9 @@ Return as a numbered list."""
         plan_text = self.rag._call_ollama(planner_prompt)
         return plan_text.split('\n') if plan_text else []
     
-    def conduct_research(self, query: str, doc_ids: List[str] = None) -> str:
-        """Researcher: Find relevant information in specific files"""
-        return self.rag.generate(query, doc_ids=doc_ids)["answer"]
+    def conduct_research(self, query: str, doc_ids: List[str] = None, use_web: bool = False) -> str:
+        """Researcher: Find relevant information in specific files and optionally the web"""
+        return self.rag.generate(query, doc_ids=doc_ids, use_web=use_web)["answer"]
     
     def analyze_findings(self, findings: str) -> str:
         """Analyst: Synthesize and identify patterns"""
@@ -180,7 +191,7 @@ Is it good, fair, or poor?"""
             "quality_pass": "good" in feedback.lower()
         }
     
-    def orchestrate_full_research(self, query: str, doc_ids: List[str] = None) -> Dict:
+    def orchestrate_full_research(self, query: str, doc_ids: List[str] = None, use_web: bool = False) -> Dict:
         """
         Run complete multi-agent research workflow, matching the Next.js frontend structure.
         """
@@ -205,8 +216,8 @@ Is it good, fair, or poor?"""
         })
         
         # Step 2: Research
-        print(f"2. RESEARCHER AGENT (Targeting {doc_ids})...")
-        research_str = self.conduct_research(query, doc_ids=doc_ids)
+        print(f"2. RESEARCHER AGENT (Targeting {doc_ids}, Web: {use_web})...")
+        research_str = self.conduct_research(query, doc_ids=doc_ids, use_web=use_web)
         steps.append({
             "agent": "Researcher",
             "input": plan_text,
@@ -272,11 +283,11 @@ rag_pipeline = RAGPipeline()
 research_orchestrator = ResearchOrchestrator()
 
 
-def generate_with_rag(query: str, doc_ids: List[str] = None) -> Dict:
-    """Simple RAG generation with doc filtering"""
-    return rag_pipeline.generate(query, doc_ids=doc_ids)
+def generate_with_rag(query: str, doc_ids: List[str] = None, use_web: bool = False) -> Dict:
+    """Simple RAG generation with doc filtering and web support"""
+    return rag_pipeline.generate(query, doc_ids=doc_ids, use_web=use_web)
 
 
-def run_full_research(query: str, doc_ids: List[str] = None) -> Dict:
-    """Run full multi-agent research with doc filtering"""
-    return research_orchestrator.orchestrate_full_research(query, doc_ids=doc_ids)
+def run_full_research(query: str, doc_ids: List[str] = None, use_web: bool = False) -> Dict:
+    """Run full multi-agent research with doc filtering and web support"""
+    return research_orchestrator.orchestrate_full_research(query, doc_ids=doc_ids, use_web=use_web)
