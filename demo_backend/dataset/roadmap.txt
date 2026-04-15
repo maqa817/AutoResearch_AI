@@ -1,0 +1,17 @@
+Future Product Roadmap (2025-2026)
+=================================
+
+Phase 1: Foundation (Current)
+- Implementation of core Multi-Agent orchestration.
+- Support for local PDF and Web-based research.
+- Real-time research progress dashboard.
+
+Phase 2: Enterprise Integration (Q3 2025)
+- Native integration with Slack, Microsoft Teams, and Notion for automatic report sharing.
+- Support for multi-modal research (Analyzing images, charts, and diagrams in PDFs).
+- Custom fine-tuning module for private company documentation.
+
+Phase 3: Autonomous Operations (2026)
+- Scheduled research "Watchdogs" that monitor the web 24/7 for specific trend changes.
+- Integration with CRM systems (Salesforce/HubSpot) to automatically enrich lead data.
+- Collaborative research sessions (Multiple humans working with multiple AI agents).
