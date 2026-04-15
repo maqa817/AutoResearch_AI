@@ -60,5 +60,5 @@ htmlcov/
 
 # Dataset
 /dataset/*
-!/dataset/sample.txt
-!/dataset/.gitkeep
+/dataset/sample.txt
+/dataset/.gitkeep

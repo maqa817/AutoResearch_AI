@@ -197,8 +197,11 @@ class EmbeddingManager:
                 chunk_meta = self.metadata["chunks"][idx]
                 
                 # STRICT FILTER: Only include if doc_id matches selected documents
-                if doc_ids and chunk_meta["doc_id"] not in doc_ids:
-                    continue
+                if doc_ids is not None:
+                    if len(doc_ids) == 0:
+                        return [] # If an empty list is passed, we return nothing
+                    if chunk_meta["doc_id"] not in doc_ids:
+                        continue
                     
                 results.append({
                     "text": chunk_meta["text"],

@@ -51,6 +51,7 @@ export default function Dashboard() {
   
   // Settings
   const [useFullOrchestration, setUseFullOrchestration] = useState(true);
+  const [useWeb, setUseWeb] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,33 +100,81 @@ export default function Dashboard() {
     e.preventDefault();
     if (!query.trim()) { setError('Research parameters missing.'); return; }
     setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null);
+    
     try {
-      const res = await fetch('/api/research', {
+      let endpoint = '/api/research';
+      if (useFullOrchestration) {
+        endpoint = 'http://localhost:8000/api/research/stream';
+      }
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Sending both 'query' (Full) and 'question' (Demo) for max compatibility
         body: JSON.stringify({ 
           query, 
-          question: query, 
-          useFullOrchestration, 
-          documents: documents.map(d => d.name) 
+          question: query, // Support Demo parameters
+          use_full_orchestration: useFullOrchestration, 
+          useFullOrchestration, // Legacy support
+          use_web: useWeb, 
+          selected_documents: documents.map(d => d.name) 
         }),
       });
+
+      if (!res.ok) throw new Error('Inference failure. Check backend.');
       
-      if (!res.ok) throw new Error('Inference failure. Check backend connection.');
-      
-      const data = await res.json();
-      
-      // Support both 'finalAnswer' (Full) and 'answer' (Demo) formats
-      const finalResult = data.finalAnswer || data.answer;
-      
-      if (useFullOrchestration && data.steps) {
-        setAgentSteps(data.steps); 
-        setResponse(finalResult); 
-        setCriticism(data.criticism || null);
-      } else {
-        setResponse(finalResult);
+      // If not orchestration or streaming not supported, handle as JSON
+      if (!useFullOrchestration || !res.body) {
+        const data = await res.json();
+        setResponse(data.finalAnswer || data.answer || '');
+        if (data.steps) setAgentSteps(data.steps);
+        setLoading(false);
+        return;
       }
+
+      // SSE reading logic
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; 
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const payload = JSON.parse(line.slice(6));
+              const { type, data } = payload;
+
+              if (type === 'agent_start') {
+                setLoading(false); 
+                setAgentSteps(prev => [...prev, { agent: data.agent, input: '', output: '', timestamp: new Date().toISOString() }]);
+              } else if (type === 'agent_token') {
+                setAgentSteps(prev => {
+                  const newSteps = [...prev];
+                  const last = newSteps[newSteps.length - 1];
+                  if (last && last.agent === data.agent) {
+                    last.output += data.token;
+                  }
+                  return newSteps;
+                });
+                if (data.agent === 'Writer') {
+                  setResponse(prev => prev + data.token);
+                }
+              } else if (type === 'complete') {
+                setCriticism(data.criticism || null);
+              }
+            } catch (err) {
+              console.error('SSE parse error:', err);
+            }
+          }
+        }
+      }
+
     } catch (err: any) { 
       setError(err.message || 'Connection lost'); 
     } finally { 
@@ -306,6 +355,24 @@ export default function Dashboard() {
               <div>
                 <p className="font-bold text-base mb-1">Agentic Pipeline</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">Engages Planner, Researcher, Analyst, and Critic models iteratively.</p>
+              </div>
+            </div>
+
+            {/* Web Search Toggle */}
+            <div 
+              onClick={() => setUseWeb(!useWeb)}
+              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${
+                useWeb ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-card border-border hover:bg-secondary/50'
+              }`}
+            >
+              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                useWeb ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-transparent border-border'
+              }`}>
+                {useWeb && <CheckCircle2 className="w-3.5 h-3.5" />}
+              </div>
+              <div>
+                <p className="font-bold text-base mb-1">Web Augmentation</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">Pulls real-time data from DuckDuckGo to supplement local files.</p>
               </div>
             </div>
 

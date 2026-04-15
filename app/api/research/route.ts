@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, useFullOrchestration, action, config, documents } = body;
+    const { query, useFullOrchestration, use_web, action, config, documents } = body;
 
     // Handle config updates
     if (action === "updateConfig" && config) {
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     const fastApiRequest = {
       query: query,
       use_full_orchestration: useFullOrchestration || false,
+      use_web: use_web || false,
       selected_documents: (documents || []).map((name: string) => name.replace('.', '_').replace('/', '_'))
     };
 

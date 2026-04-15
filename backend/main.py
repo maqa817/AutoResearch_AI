@@ -4,7 +4,7 @@ RAG-powered multi-agent research system with semantic retrieval
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -15,7 +15,7 @@ import PyPDF2
 
 # Import RAG and embedding modules
 from embed import embed_and_add_document, get_embedding_stats, embedding_manager
-from rag import generate_with_rag, run_full_research
+from rag import generate_with_rag, run_full_research, run_full_research_stream
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +42,7 @@ class QueryRequest(BaseModel):
     """Request model for research queries"""
     query: str
     use_full_orchestration: bool = False  # Use all 5 agents vs simple RAG
+    use_web: bool = False                 # Toggle web search enhancement
     selected_documents: Optional[List[str]] = None  # Specific doc_ids to search
 
 class SimpleRAGResponse(BaseModel):
@@ -163,8 +164,8 @@ async def research_query(request: QueryRequest):
         
         if request.use_full_orchestration:
             # Full multi-agent workflow
-            logger.info(f"Starting full research orchestration for: {request.query} (Files: {doc_ids})")
-            result = run_full_research(request.query, doc_ids=doc_ids)
+            logger.info(f"Starting full research orchestration for: {request.query} (Files: {doc_ids}, Web: {request.use_web})")
+            result = run_full_research(request.query, doc_ids=doc_ids, use_web=request.use_web)
             
             # Ensure we return the full schema expected by Next.js
             return {
@@ -177,8 +178,8 @@ async def research_query(request: QueryRequest):
             }
         else:
             # Simple RAG
-            logger.info(f"Starting simple RAG for: {request.query} (Files: {doc_ids})")
-            result = generate_with_rag(request.query, doc_ids=doc_ids)
+            logger.info(f"Starting simple RAG for: {request.query} (Files: {doc_ids}, Web: {request.use_web})")
+            result = generate_with_rag(request.query, doc_ids=doc_ids, use_web=request.use_web)
             return {
                 "query": request.query,
                 "answer": result["answer"],
@@ -190,6 +191,23 @@ async def research_query(request: QueryRequest):
     except Exception as e:
         logger.error(f"Research error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
+
+@app.post("/api/research/stream")
+async def research_query_stream(request: QueryRequest):
+    """
+    Streaming multi-agent research endpoint via Server-Sent Events (SSE)
+    """
+    doc_ids = request.selected_documents
+    logger.info(f"Starting streamed full research orchestration for: {request.query}")
+    
+    if not request.use_full_orchestration:
+        raise HTTPException(status_code=400, detail="Streaming requires full orchestration mode")
+
+    return StreamingResponse(
+        run_full_research_stream(request.query, doc_ids=doc_ids, use_web=request.use_web),
+        media_type="text/event-stream"
+    )
+
 
 @app.post("/api/batch-research")
 async def batch_research(queries: List[str]):

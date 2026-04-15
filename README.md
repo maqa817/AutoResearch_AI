@@ -114,31 +114,33 @@ Visit: `http://localhost:3000`
 
 ## 🌟 Advanced Features
 
-* Dynamic semantic chunking
-* Agent collaboration pipeline
-* Hardware awareness and auto-switching
-* Batch processing and cache reuse
-* Fully local execution
+* **Real-Time Token Streaming**: Consume inference results as they happen via Server-Sent Events (SSE).
+* **Agentic Research Trace**: Watch the Planner, Researcher, Analyst, and Writer collaborate in a live-updating backtrace timeline.
+* **Strict Context Control**: Absolute document filtering ensures the AI only accesses files you explicitly select for each query.
+* **Intelligent fallback**: Gracefully handles general queries vs. document-grounded research.
+* **Dynamic semantic chunking**: Intelligent text splitting with overlap for context preservation.
+* **Hardware acceleration**: Deep integration with NVIDIA RTX GPUs via Ollama and PyTorch.
+* **Fully air-gapped**: Zero external data transmission for 100% privacy.
 
 ---
 
 ## 🔮 Future Enhancements
 
-* PDF/OCR multi-modal ingestion
-* Token streaming to frontend
+* PDF/OCR multi-modal ingestion (Vision models)
 * Cross-document consistency re-ranking
 * LoRA fine-tuning for domain-specific models
 * Semantic query routing
+* Persistence layer for research history
 
 ---
 
 ## 📌 Example Query
 
 **Query:**
-*"Summarize Q2 HR report dataset and highlight risks."*
+*"Summarize specifically from Document_1.txt and ignore the database."*
 
 **AI Response:**
-*"Employee satisfaction dropped 12% in Q2. Highest turnover risk in engineering. Recommend immediate engagement programs and team alignment sessions."*
+*"Synthesized report exclusively based on Doc_1: Insights found include X, Y, and Z. Reference vectors from other files were excluded as per strict selection protocol."*
 
 ---
 
