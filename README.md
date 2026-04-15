@@ -42,6 +42,7 @@ Each query flows through **5 specialized autonomous agents**, ensuring high prec
 * **Backend**: FastAPI + Python 3.10+
 * **Frontend**: React 18 + Vite (premium 12-column luxury grid)
 * **Vector DB**: FAISS (local, memory-mapped, scalable to millions of chunks)
+* **Web Search**: Integrated DuckDuckGo Search Protocol
 * **LLM**: Ollama running Mistral-7B / Llama 2-7B locally
 * **Hardware**: GPU-aware (NVIDIA RTX 40xx series), fallback to CPU
 
@@ -115,6 +116,7 @@ Visit: `http://localhost:3000`
 ## 🌟 Advanced Features
 
 * **Real-Time Token Streaming**: Consume inference results as they happen via Server-Sent Events (SSE).
+* **Deep Web Augmentation**: Real-time integration with **DuckDuckGo API** to supplement local document analysis with the latest web data.
 * **Agentic Research Trace**: Watch the Planner, Researcher, Analyst, and Writer collaborate in a live-updating backtrace timeline.
 * **Strict Context Control**: Absolute document filtering ensures the AI only accesses files you explicitly select for each query.
 * **Intelligent fallback**: Gracefully handles general queries vs. document-grounded research.
