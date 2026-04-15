@@ -1,15 +1,13 @@
-Capabilities and Use Cases
-==========================
+Specific Capabilities of AutoResearch AI
+====================================
 
-AutoResearch AI can be used for a wide range of research tasks:
+The system excels at the following specialized tasks:
 
-1. **Market Analysis**: Gathering data on competitors, trends, and market sentiment.
-2. **Academic Research**: Finding and summarizing research papers on specific topics.
-3. **Internal Documentation Search**: Indexing and searching through large volumes of company PDFs.
-4. **Report Generation**: Automatically creating structured reports from raw data.
+1. Competitive Intelligence: Automatically tracking competitor price changes and product launches.
+2. Technical Summarization: Turning complex 50-page PDF research papers into 1-page summaries.
+3. Sentiment Tracking: Monitoring social media and news for changes in brand perception.
 
-The system supports:
-- PDF, TXT, and Markdown files.
-- Web-augmented research via DuckDuckGo and Tavily.
-- Multi-step reasoning and self-correction.
-- Exporting results to various formats.
+Supported Connectors:
+- Web: Tavily, DuckDuckGo, Google Search.
+- Documents: PDF, Markdown, JSON, CSV.
+- Export: PDF reports, Slack notifications, Webhooks.

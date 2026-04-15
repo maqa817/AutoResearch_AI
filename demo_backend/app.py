@@ -44,13 +44,26 @@ def load_dataset():
     logger.info(f"Total documents loaded: {len(CORPUS)}")
 
 def search(question: str) -> List[str]:
-    keywords = question.lower().split()
+    # Common words to ignore for better filtering
+    STOP_WORDS = {"is", "the", "a", "an", "what", "how", "how", "to", "in", "on", "at", "for", "with", "and", "or", "of", "about"}
+    keywords = [kw for kw in question.lower().split() if kw not in STOP_WORDS and len(kw) > 2]
+    
+    if not keywords:
+        return []
+
     results = []
     for doc in CORPUS:
         doc_lower = doc.lower()
-        score = sum(1 for kw in keywords if kw in doc_lower)
-        if score > 0:
+        # Score based on how many keywords match and their frequency
+        score = 0
+        for kw in keywords:
+            count = doc_lower.count(kw)
+            if count > 0:
+                score += count + 5  # Give bonus for presence
+        
+        if score > 5:  # Minimum threshold to avoid weak matches
             results.append((score, doc))
+            
     results.sort(key=lambda x: x[0], reverse=True)
     return [doc for _, doc in results[:3]]
 
