@@ -100,14 +100,25 @@ export default function Dashboard() {
   const downloadPDF = async () => {
     const el = document.getElementById('synthesis-report-content');
     if (!el) return;
+
     try {
-      // Use variables to bypass strict static analysis in Next.js 16+ Turbopack for Node-specific dependencies
-      const h2c = 'html2canvas';
-      const jsp = 'jspdf';
-      const { default: html2canvas } = await import(/* webpackIgnore: true */ h2c);
-      const { default: jsPDF } = await import(/* webpackIgnore: true */ jsp);
+      // Cleanest approach to bypass Next.js SSR and bundler errors natively
+      const loadScript = (src: string) => new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+
+      const html2canvas = (window as any).html2canvas;
+      const jsPDF = (window as any).jspdf.jsPDF;
       
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
