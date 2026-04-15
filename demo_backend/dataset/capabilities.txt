@@ -1,0 +1,15 @@
+Capabilities and Use Cases
+==========================
+
+AutoResearch AI can be used for a wide range of research tasks:
+
+1. **Market Analysis**: Gathering data on competitors, trends, and market sentiment.
+2. **Academic Research**: Finding and summarizing research papers on specific topics.
+3. **Internal Documentation Search**: Indexing and searching through large volumes of company PDFs.
+4. **Report Generation**: Automatically creating structured reports from raw data.
+
+The system supports:
+- PDF, TXT, and Markdown files.
+- Web-augmented research via DuckDuckGo and Tavily.
+- Multi-step reasoning and self-correction.
+- Exporting results to various formats.

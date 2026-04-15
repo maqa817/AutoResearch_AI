@@ -1,0 +1,20 @@
+AutoResearch AI Architecture
+==========================
+
+AutoResearch AI is built on a modular, agentic architecture. 
+It consists of several core components:
+
+1. **Agent Orchestrator**: The central brain that coordinates different AI agents.
+2. **Specialized Agents**:
+   - **Planner Agent**: Breaks down the research goal into actionable steps.
+   - **Researcher Agent**: Performs web searches and document retrieval.
+   - **Analyst Agent**: Evaluates the gathered information for relevance and truth.
+   - **Writer Agent**: Composes the final report based on analysis.
+   - **Critic Agent**: Reviews the report and suggests improvements.
+
+3. **Knowledge Base**: A vector database (FAISS) that stores document embeddings for RAG.
+4. **Local LLM Engine**: Powered by Ollama, allowing the system to run entirely offline with llama3, mistral, or other models.
+
+Hardware Requirements:
+For the full version, an NVIDIA GPU with at least 8GB VRAM is recommended (e.g., RTX 3060/4060).
+This demo version runs on pure CPU using keyword matching.

@@ -1,0 +1,16 @@
+AutoResearch AI Demo Dataset
+===========================
+
+The AutoResearch AI system is a multi-agent RAG (Retrieval Augmented Generation) platform.
+It uses specialized agents to perform research, analyze findings, and write reports.
+
+Key features:
+1. Multi-agent orchestration: Different agents (Planner, Researcher, Analyst, Writer, Critic) work together.
+2. RAG pipeline: Retrieves relevant context from local documents before answering.
+3. GPU optimization: Uses Ollama with hardware acceleration for local inference.
+
+This demo version is a simplified backend designed for lightweight deployment on Render's free tier.
+It removes heavy dependencies like FAISS and Ollama, replacing them with fast keyword-based search.
+
+The frontend is built with React and Next.js, providing a modern dashboard for research management.
+It supports document uploads, history tracking, and real-time research progress visualization.
