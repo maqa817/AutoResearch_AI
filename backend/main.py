@@ -257,13 +257,35 @@ async def list_documents():
 # ============== Utility Functions ==============
 
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
-    """Extract text from PDF file"""
+    """Extract text and tables from PDF file using robust parsing"""
+    import pdfplumber
     from io import BytesIO
     
-    pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_bytes))
     text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() + "\n"
+    try:
+        with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                # 1. Structural Text Extraction
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n\n"
+                
+                # 2. Table Data Extraction
+                tables = page.extract_tables()
+                for table in tables:
+                    text += "=== TABLE DATA ===\n"
+                    for row in table:
+                        row_str = " | ".join(str(cell).strip() if cell else "" for cell in row)
+                        text += f"{row_str}\n"
+                    text += "==================\n\n"
+
+        # 3. Scanned PDF (OCR) Detection Heuristic
+        if len(text.strip()) < 50 and len(pdf.pages) > 0:
+            text += "\n[SYSTEM ALERT: Document detected as a scanned image. Advanced unstructured OCR pipeline (Vision/Tesseract) required for full extraction.]"
+            
+    except Exception as e:
+        print(f"PDF Parsing error: {e}")
+        
     return text
 
 # ============== Startup & Shutdown ==============

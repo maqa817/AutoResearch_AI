@@ -9,9 +9,11 @@ import {
   Trash2, BrainCircuit, X, 
   Search, ShieldCheck, Cpu, ArrowLeft, ArrowRight,
   AlignLeft, BarChart2, MessageSquare,
-  AlertCircle, CheckCircle2, SlidersHorizontal
+  AlertCircle, CheckCircle2, SlidersHorizontal, Download, Bookmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import Link from 'next/link';
 
@@ -47,6 +49,7 @@ export default function Dashboard() {
   const [response, setResponse] = useState('');
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [criticism, setCriticism] = useState<CriticReview | null>(null);
+  const [chunks, setChunks] = useState<any[]>([]); 
   const [error, setError] = useState('');
   
   // Settings
@@ -92,14 +95,30 @@ export default function Dashboard() {
   const purgeSystem = async () => {
     if (confirm('Clear working memory? This will purge the index.')) {
       await fetch('/api/clear-index', { method: 'POST' });
-      setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null);
+      setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null); setChunks([]);
+    }
+  };
+
+  const downloadPDF = async () => {
+    const el = document.getElementById('synthesis-report-content');
+    if (!el) return;
+    try {
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('AutoResearch_Report.pdf');
+    } catch (e) {
+      console.error('PDF generation failed', e);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) { setError('Research parameters missing.'); return; }
-    setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null);
+    setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null); setChunks([]);
     
     try {
       let endpoint = '/api/research';
@@ -167,6 +186,7 @@ export default function Dashboard() {
                 }
               } else if (type === 'complete') {
                 setCriticism(data.criticism || null);
+                if (data.chunks) setChunks(data.chunks);
               }
             } catch (err) {
               console.error('SSE parse error:', err);
@@ -409,14 +429,21 @@ export default function Dashboard() {
                   <BrainCircuit className="w-6 h-6 text-primary" />
                   Synthesis Report
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${loading ? 'bg-[#F59E0B] animate-pulse' : response ? 'bg-[#34D399]' : 'bg-muted-foreground'}`} />
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {loading ? 'Processing' : response ? 'Complete' : 'Standby'}
-                  </span>
+                <div className="flex items-center gap-4">
+                  {response && (
+                    <Button variant="outline" size="sm" onClick={downloadPDF} className="h-8 gap-2 text-xs font-bold">
+                      <Download className="w-3.5 h-3.5" /> Export PDF
+                    </Button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${loading ? 'bg-[#F59E0B] animate-pulse' : response ? 'bg-[#34D399]' : 'bg-muted-foreground'}`} />
+                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      {loading ? 'Processing' : response ? 'Complete' : 'Standby'}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 flex-1 flex flex-col relative min-h-[400px]">
+              <CardContent id="synthesis-report-content" className="p-8 flex-1 flex flex-col relative min-h-[400px] bg-card">
                 {!response && !loading ? (
                   <div className="flex-1 flex flex-col items-center justify-center opacity-30 absolute inset-0">
                     <Sparkles className="w-16 h-16 mb-6 stroke-1" />
@@ -438,7 +465,7 @@ export default function Dashboard() {
                         </div>
                       </motion.div>
                     ) : (
-                      <div className="animate-in fade-in duration-700" dangerouslySetInnerHTML={{ __html: response.replace(/\n\n/g, '</p><p>').replace(/\n(.*)/g, '<br/>$1').replace(/^/, '<p>').concat('</p>') }} />
+                      <div className="animate-in fade-in duration-700" dangerouslySetInnerHTML={{ __html: response.replace(/\n\n/g, '</p><p>').replace(/\n(.*)/g, '<br/>$1').replace(/^/, '<p>').replace(/\[(Document \d+)\]/g, '<span class="text-primary font-bold bg-primary/10 px-1 rounded cursor-pointer">[$1]</span>').concat('</p>') }} />
                     )}
                   </div>
                 )}
@@ -448,7 +475,7 @@ export default function Dashboard() {
             {/* BOTTOM: Quality Critic Box */}
             <AnimatePresence>
               {criticism && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                   <Card className={`rounded-xl border ${
                     criticism.quality === 'good' ? 'border-[#34D399]/30 bg-[#34D399]/5' :
                     criticism.quality === 'fair' ? 'border-[#F59E0B]/30 bg-[#F59E0B]/5' : 'border-destructive/30 bg-destructive/5'
@@ -460,6 +487,9 @@ export default function Dashboard() {
                           <ShieldCheck className={`w-5 h-5 ${criticism.quality === 'good' ? 'text-[#34D399]' : 'text-[#F59E0B]'}`} />
                           <span className="text-xl font-black capitalize">{criticism.quality} Result</span>
                         </div>
+                        {criticism.quality === 'poor' && (
+                          <span className="text-[10px] bg-destructive text-destructive-foreground px-2 py-0.5 rounded font-bold uppercase w-fit">Self-Correction Loop Active</span>
+                        )}
                       </div>
                       <div className="flex-1 space-y-4">
                         {criticism.hallucinations?.length > 0 && (
@@ -481,6 +511,37 @@ export default function Dashboard() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* CITATION EXPLORER */}
+                  {chunks.length > 0 && (
+                    <Card className="bg-card border-border subtle-shadow rounded-xl overflow-hidden mt-4">
+                      <CardHeader className="py-3 px-4 bg-secondary/30 border-b border-border/50 flex flex-row items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Bookmark className="w-4 h-4 text-primary" />
+                          <span className="font-bold text-sm tracking-wide">Live Citation Explorer</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium">{chunks.length} Retrieved Chunks</span>
+                      </CardHeader>
+                      <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {chunks.map((c, i) => (
+                          <div key={i} className="bg-secondary/20 border border-border rounded-lg p-4 relative group">
+                            <span className="absolute -top-3 -left-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                              Document {i + 1}
+                            </span>
+                            <div className="flex justify-between items-center mb-2 mt-1">
+                              <span className="text-xs font-bold truncate pr-3 opacity-70">{c.doc_id}</span>
+                              <span className="text-[10px] font-mono bg-background px-1.5 py-0.5 rounded border border-border text-[#34D399]">
+                                SIM: {(c.similarity_score * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-4 group-hover:line-clamp-none transition-all duration-300 relative z-10">
+                              "...{c.text}..."
+                            </p>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

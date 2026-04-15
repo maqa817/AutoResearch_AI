@@ -28,24 +28,25 @@ class RAGPipeline:
         self.model = model
         self.chunk_count = 3  # Number of chunks to retrieve
     
-    def _retrieve_context(self, query: str, doc_ids: List[str] = None) -> str:
+    def _retrieve_context(self, query: str, doc_ids: List[str] = None):
         """
         Retrieve relevant chunks and format as context
         """
         if doc_ids is not None and len(doc_ids) == 0:
-            return "[NO DOCUMENTS SELECTED BY USER]"
+            return "[NO DOCUMENTS SELECTED BY USER]", []
 
         chunks = retrieve_relevant_chunks(query, top_k=self.chunk_count, doc_ids=doc_ids)
         
         if not chunks:
-            return "[No relevant information found in the selected files]"
+            return "[No relevant information found in the selected files]", []
         
         context = "RELEVANT DOCUMENTS:\n\n"
         for i, chunk in enumerate(chunks, 1):
             score = chunk.get("similarity_score", 0)
             context += f"[Document {i} - Relevance: {score:.2f} - ID: {chunk['doc_id']}]\n"
-            context += f"{chunk['text'][:500]}...\n\n" 
+            context += f"{chunk['text']}\n\n" 
         
+        return context, chunks
         return context
     
     def _build_prompt(self, query: str, context: str) -> str:
@@ -118,23 +119,23 @@ ANSWER:"""
         Generate response using RAG pipeline with optional doc filtering and web search
         """
         # Step 1: Retrieve relevant context from local files
-        local_context = self._retrieve_context(query, doc_ids=doc_ids)
-        
-        # Step 2: Retrieve web context if requested
+        # Get Context
+        local_context, chunks = self._retrieve_context(query, doc_ids=doc_ids)
         web_context = ""
+        
         if use_web:
             results = web_search(query)
             web_context = format_web_results_as_context(results)
             
         full_context = local_context + "\n" + web_context
-        
-        # Step 3: Build prompt
         prompt = self._build_prompt(query, full_context)
         
-        # Step 4: Generate response
+        # Output Log (console context)
+        print(f"INFO:tools:RAG Full Context Len: {len(full_context)}")
+
+        # Call Ollama
         answer = self._call_ollama(prompt)
         
-        # Step 5: Return structured result
         return {
             "query": query,
             "answer": answer,
@@ -321,8 +322,7 @@ Is it good, fair, or poor?"""
 
         # Step 2: Research
         yield format_event("agent_start", {"agent": "Researcher"})
-        # We need local and web context
-        local_context = self.rag._retrieve_context(query, doc_ids=doc_ids)
+        local_context, raw_chunks = self.rag._retrieve_context(query, doc_ids=doc_ids)
         web_context = ""
         if use_web:
             results = web_search(query)
@@ -348,43 +348,63 @@ Is it good, fair, or poor?"""
             
         yield format_event("agent_end", {"agent": "Analyst", "output": analysis_str, "timestamp": datetime.now().isoformat()})
 
-        # Step 4: Writer
-        yield format_event("agent_start", {"agent": "Writer"})
-        report_prompt = f"""Write a concise answer to: {query}\nUsing this analysis of the documents:\n{analysis_str}"""
-        
-        report_str = ""
-        for token in self.rag._call_ollama(report_prompt, stream=True):
-            report_str += token
-            yield format_event("agent_token", {"agent": "Writer", "token": token})
+        # Step 4 & 5: Self-Refining Loop (Writer & Critic)
+        max_refines = 1
+        refine_attempts = 0
+        final_report_str = ""
+        criticism_data = None
+
+        while refine_attempts <= max_refines:
+            agent_name = "Writer" if refine_attempts == 0 else "Re-Writer"
+            yield format_event("agent_start", {"agent": agent_name})
+
+            if refine_attempts == 0:
+                report_prompt = f"""Write a concise answer to: {query}\nUsing this analysis of the documents:\n{analysis_str}"""
+            else:
+                report_prompt = f"""Please REWRITE your previous answer to: {query}
+Based on this Critc Feedback: {criticism_data.get('suggestions', 'Poor quality')}
+Previous text: {final_report_str}
+New Answer (Do not output anything besides the new answer text):"""
+
+            report_str = ""
+            for token in self.rag._call_ollama(report_prompt, stream=True):
+                report_str += token
+                yield format_event("agent_token", {"agent": agent_name, "token": token})
+                
+            yield format_event("agent_end", {"agent": agent_name, "output": report_str, "timestamp": datetime.now().isoformat()})
+            final_report_str = report_str
+
+            yield format_event("agent_start", {"agent": "Critic"})
+            critique_prompt = f"""Review this answer for accuracy against the source:\n{report_str}\nIs it good, fair, or poor? If poor, provide VERY brief suggestions."""
             
-        yield format_event("agent_end", {"agent": "Writer", "output": report_str, "timestamp": datetime.now().isoformat()})
+            feedback = ""
+            for token in self.rag._call_ollama(critique_prompt, stream=True):
+                feedback += token
+                yield format_event("agent_token", {"agent": "Critic", "token": token})
+            
+            quality_str = 'fair'
+            if 'good' in feedback.lower(): quality_str = 'good'
+            elif 'poor' in feedback.lower(): quality_str = 'poor'
 
-        # Step 5: Critic
-        yield format_event("agent_start", {"agent": "Critic"})
-        critique_prompt = f"""Review this answer for accuracy against the source:\n{report_str}\nIs it good, fair, or poor?"""
-        
-        feedback = ""
-        for token in self.rag._call_ollama(critique_prompt, stream=True):
-            feedback += token
-            yield format_event("agent_token", {"agent": "Critic", "token": token})
-        
-        quality_str = 'fair'
-        if 'good' in feedback.lower(): quality_str = 'good'
-        elif 'poor' in feedback.lower(): quality_str = 'poor'
+            criticism_data = {
+                "quality": quality_str,
+                "hallucinations": [],
+                "suggestions": [feedback.strip()[:150] + "..."],
+                "shouldRegenerate": quality_str == 'poor'
+            }
+            
+            yield format_event("agent_end", {"agent": "Critic", "output": feedback, "timestamp": datetime.now().isoformat()})
 
-        criticism = {
-            "quality": quality_str,
-            "hallucinations": [],
-            "suggestions": [],
-            "shouldRegenerate": quality_str == 'poor'
-        }
-        
-        yield format_event("agent_end", {"agent": "Critic", "output": feedback, "timestamp": datetime.now().isoformat()})
+            if quality_str != 'poor':
+                break
+            
+            refine_attempts += 1
 
         # Final
         yield format_event("complete", {
-            "finalAnswer": report_str,
-            "criticism": criticism
+            "finalAnswer": final_report_str,
+            "criticism": criticism_data,
+            "chunks": raw_chunks
         })
 
 
