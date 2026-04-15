@@ -102,7 +102,6 @@ export default function Dashboard() {
     if (!el) return;
 
     try {
-      // Cleanest approach to bypass Next.js SSR and bundler errors natively
       const loadScript = (src: string) => new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
         const script = document.createElement('script');
@@ -118,13 +117,81 @@ export default function Dashboard() {
       const html2canvas = (window as any).html2canvas;
       const jsPDF = (window as any).jspdf.jsPDF;
       
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
+      // 1. Create invisible staging environment for professional PDF styling
+      const stage = document.createElement('div');
+      stage.style.position = 'absolute';
+      stage.style.left = '-9999px';
+      stage.style.top = '0';
+      stage.style.width = '800px'; 
+      stage.style.backgroundColor = '#ffffff';
+      stage.style.padding = '50px 60px'; // Professional margins
+      stage.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+      
+      // 2. Build Document Header
+      const header = document.createElement('div');
+      header.innerHTML = `
+        <div style="border-bottom: 2px solid #18181b; padding-bottom: 20px; margin-bottom: 30px;">
+          <h1 style="font-size: 28px; margin: 0; font-weight: 900; color: #18181b; letter-spacing: -0.5px;">AutoResearch AI</h1>
+          <p style="color: #52525b; margin: 5px 0 0 0; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Executive Synthesis Report</p>
+          <div style="margin-top: 20px; font-size: 13px; color: #71717a; display: flex; flex-direction: column; gap: 4px;">
+            <span><strong style="color:#27272a">Research Parameter:</strong> "${query}"</span>
+            <span><strong style="color:#27272a">Generated At:</strong> ${new Date().toLocaleString()}</span>
+          </div>
+        </div>
+      `;
+      stage.appendChild(header);
+
+      // 3. Inject Content & Force Light Mode Styling
+      const contentClone = el.cloneNode(true) as HTMLElement;
+      contentClone.style.backgroundColor = 'transparent';
+      contentClone.style.color = '#18181b'; 
+      contentClone.style.border = 'none';
+      contentClone.style.boxShadow = 'none';
+      contentClone.style.minHeight = 'auto'; // Remove fixed UI height
+      contentClone.className = "prose max-w-none text-[15px] prose-p:leading-relaxed"; // Force light mode typography
+      
+      // Override dark mode text classes
+      const textElements = contentClone.querySelectorAll('*');
+      textElements.forEach(node => {
+         const n = node as HTMLElement;
+         n.style.color = '#27272a'; // Force dark gray text
+         if (n.tagName === 'STRONG' || n.tagName === 'H1' || n.tagName === 'H2' || n.tagName === 'H3') n.style.color = '#000000';
+         if (n.tagName === 'SPAN' && n.innerHTML.includes('Document')) {
+           n.style.backgroundColor = '#f4f4f5'; // Light gray for citation tags
+           n.style.color = '#09090b';
+         }
+      });
+
+      stage.appendChild(contentClone);
+      document.body.appendChild(stage);
+
+      // 4. Capture & PDF Construction (Multi-page support)
+      const canvas = await html2canvas(stage, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF('p', 'mm', 'a4');
+      
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
       pdf.save('AutoResearch_Report.pdf');
+
+      // 5. Cleanup DOM
+      document.body.removeChild(stage);
+      
     } catch (e) {
       console.error('PDF generation failed', e);
     }
