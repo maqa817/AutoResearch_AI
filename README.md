@@ -89,7 +89,11 @@ cd backend
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# CRITICAL: Install CUDA-accelerated PyTorch for RTX GPU support
+# This enables the "device: CUDA" mode for lightning-fast document embeddings
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 --force-reinstall
+
 uvicorn main:app --reload --port 8000
 ```
 
