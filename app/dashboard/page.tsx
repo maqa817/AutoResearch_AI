@@ -76,8 +76,11 @@ export default function Dashboard() {
       for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
-        await fetch('http://localhost:8000/api/upload', { method: 'POST', body: formData });
+        // Using relative path to benefit from rewrites/proxies
+        await fetch('/api/upload', { method: 'POST', body: formData });
       }
+    } catch (err) {
+      console.warn("Upload failed (expected in Demo mode)", err);
     } finally {
       setIsUploading(false);
     }
@@ -87,7 +90,7 @@ export default function Dashboard() {
 
   const purgeSystem = async () => {
     if (confirm('Clear working memory? This will purge the index.')) {
-      await fetch('http://localhost:8000/api/clear-index', { method: 'POST' });
+      await fetch('/api/clear-index', { method: 'POST' });
       setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null);
     }
   };
@@ -100,16 +103,34 @@ export default function Dashboard() {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, useFullOrchestration, documents: documents.map(d => d.name) }),
+        // Sending both 'query' (Full) and 'question' (Demo) for max compatibility
+        body: JSON.stringify({ 
+          query, 
+          question: query, 
+          useFullOrchestration, 
+          documents: documents.map(d => d.name) 
+        }),
       });
-      if (!res.ok) throw new Error('Inference failure. Check backend.');
+      
+      if (!res.ok) throw new Error('Inference failure. Check backend connection.');
+      
       const data = await res.json();
+      
+      // Support both 'finalAnswer' (Full) and 'answer' (Demo) formats
+      const finalResult = data.finalAnswer || data.answer;
+      
       if (useFullOrchestration && data.steps) {
-        setAgentSteps(data.steps); setResponse(data.finalAnswer); setCriticism(data.criticism || null);
+        setAgentSteps(data.steps); 
+        setResponse(finalResult); 
+        setCriticism(data.criticism || null);
       } else {
-        setResponse(data.answer);
+        setResponse(finalResult);
       }
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) { 
+      setError(err.message || 'Connection lost'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const getAgentIcon = (name: string) => {
