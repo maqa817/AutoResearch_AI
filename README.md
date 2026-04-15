@@ -119,24 +119,24 @@ Visit: `http://localhost:3000`
 
 ## 🌟 Advanced Features
 
+* **Autonomous Self-Refinement**: The Critic agent runs verification on generated outputs. If quality hits a threshold of "poor" or hallucinations are detected, the Orchestrator safely loops back to a `"Re-Writer"`, guaranteeing quality assurance autonomously.
+* **Live Citation Explorer**: A native "Glass-box" RAG frontend component that maps exact FAISS embedding chunks directly to the UI, allowing verification of AI claims against raw similarity scores.
+* **Professional PDF Report Export**: Single-click conversion of markdown synthesis into stylized, highly-structured executive white-paper PDFs complete with generated headers and multi-page calculations entirely done natively.
+* **Structured PDF & OCR Heuristics**: Integrated `pdfplumber` to bypass bad PyPDF2 parsing. Extracts exact row/column structures for tables, and flags unstructured/scanned images for Vision-model OCR fallback automatically.
 * **Real-Time Token Streaming**: Consume inference results as they happen via Server-Sent Events (SSE).
 * **Deep Web Augmentation**: Real-time integration with **DuckDuckGo API** to supplement local document analysis with the latest web data.
-* **Agentic Research Trace**: Watch the Planner, Researcher, Analyst, and Writer collaborate in a live-updating backtrace timeline.
+* **Agentic Research Trace**: Watch the Planner, Researcher, Analyst, Writer, and Critic collaborate in a live-updating backtrace timeline.
 * **Strict Context Control**: Absolute document filtering ensures the AI only accesses files you explicitly select for each query.
-* **Intelligent fallback**: Gracefully handles general queries vs. document-grounded research.
-* **Dynamic semantic chunking**: Intelligent text splitting with overlap for context preservation.
-* **Hardware acceleration**: Deep integration with NVIDIA RTX GPUs via Ollama and PyTorch.
+* **Hardware acceleration**: Deep integration with NVIDIA RTX GPUs via Ollama and PyTorch (CUDA).
 * **Fully air-gapped**: Zero external data transmission for 100% privacy.
 
 ---
 
 ## 🔮 Future Enhancements
 
-* PDF/OCR multi-modal ingestion (Vision models)
-* Cross-document consistency re-ranking
-* LoRA fine-tuning for domain-specific models
-* Semantic query routing
-* Persistence layer for research history
+* Native `Llava` multi-modal offline interaction for extracting tables from the scanned heuristic pipeline.
+* Semantic query routing and query decomposition.
+* Persistence layer for research history and user sessions.
 
 ---
 
@@ -150,16 +150,19 @@ Visit: `http://localhost:3000`
 
 ---
 
-## 📈 Diagrams & Workflow (Mermaid GitHub-friendly)
+## 📈 Multi-Agent Architecture (Mermaid)
 
 ```mermaid
 graph TD
-    Q[User Query] --> P[Planner]
-    P --> R[Researcher]
-    R --> A[Analyst]
-    A --> W[Writer]
-    W --> C[Critic]
-    C --> O[Output Report]
+    Q[User Request] --> P[Planner]
+    P --> R[Researcher : FAISS & DuckDuckGo]
+    R --> A[Analyst : Context Parsing]
+    A --> W[Writer : Final Output Generator]
+    
+    W --> C{Critic : Verification}
+    
+    C -- "Quality: Poor (Self-Refines)" --> W
+    C -- "Quality: Good (Approves)" --> O[SSE Client Yield & PDF Download]
 ```
 ---
 

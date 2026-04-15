@@ -144,7 +144,7 @@ export default function Dashboard() {
       // 3. Inject Content & Force Light Mode Styling
       const contentClone = el.cloneNode(true) as HTMLElement;
       contentClone.style.backgroundColor = 'transparent';
-      contentClone.style.color = '#18181b'; 
+      contentClone.style.color = '#000000'; // Pure black text
       contentClone.style.border = 'none';
       contentClone.style.boxShadow = 'none';
       contentClone.style.minHeight = 'auto'; // Remove fixed UI height
@@ -154,11 +154,11 @@ export default function Dashboard() {
       const textElements = contentClone.querySelectorAll('*');
       textElements.forEach(node => {
          const n = node as HTMLElement;
-         n.style.color = '#27272a'; // Force dark gray text
-         if (n.tagName === 'STRONG' || n.tagName === 'H1' || n.tagName === 'H2' || n.tagName === 'H3') n.style.color = '#000000';
+         n.style.color = '#000000'; // Force PURE BLACK text override on every element
          if (n.tagName === 'SPAN' && n.innerHTML.includes('Document')) {
-           n.style.backgroundColor = '#f4f4f5'; // Light gray for citation tags
-           n.style.color = '#09090b';
+           n.style.backgroundColor = '#e4e4e7'; // Slightly darker gray for citation tags
+           n.style.color = '#000000';
+           n.style.borderColor = '#000000';
          }
       });
 
