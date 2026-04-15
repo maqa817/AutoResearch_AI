@@ -141,25 +141,29 @@ export default function Dashboard() {
       `;
       stage.appendChild(header);
 
-      // 3. Inject Content & Force Light Mode Styling
-      const contentClone = el.cloneNode(true) as HTMLElement;
-      contentClone.className = "prose max-w-none text-[15px] prose-p:leading-relaxed"; 
+      // 3. Construct Pure Native HTML Payload (Immune to Tailwind dark mode overrides)
+      const content = document.createElement('div');
+      content.style.color = '#000000';
+      content.style.fontSize = '14px';
+      content.style.lineHeight = '1.7';
+      content.style.whiteSpace = 'pre-line';
+      content.style.fontFamily = 'Arial, sans-serif';
       
-      // We must inject a <style> block with !important to completely override Tailwind Dark Mode
-      // Because html2canvas inherits the root <html> dark class
-      const styleBlock = document.createElement('style');
-      styleBlock.innerHTML = `
-        #pdf-stage, #pdf-stage * {
-          color: #000000 !important;
-          -webkit-text-fill-color: #000000 !important;
-        }
-        #pdf-stage span {
-          background-color: #e4e4e7 !important;
-        }
-      `;
-      stage.id = "pdf-stage";
-      stage.appendChild(styleBlock);
-      stage.appendChild(contentClone);
+      // We convert Markdown newlines and tags manually
+      let htmlStr = response.replace(/\n\n/g, '</p><p style="margin-bottom:12px">').replace(/\n(.*)/g, '<br/>$1');
+      if (!htmlStr.startsWith('<p>')) htmlStr = '<p>' + htmlStr;
+      if (!htmlStr.endsWith('</p>')) htmlStr = htmlStr + '</p>';
+      
+      // Highlight citations
+      htmlStr = htmlStr.replace(/\[(Document \d+)\]/g, '<strong style="background: #f1f1f1; border: 1px solid #ccc; font-size: 12px; padding: 2px 6px; border-radius: 4px; color: #000;">[$1]</strong>');
+      
+      content.innerHTML = htmlStr;
+      
+      // Override ANY rogue text elements
+      const allEls = content.querySelectorAll('*');
+      allEls.forEach(el => { (el as HTMLElement).style.color = '#000000'; });
+
+      stage.appendChild(content);
       document.body.appendChild(stage);
 
       // 4. Capture & PDF Construction (Multi-page support)
