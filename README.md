@@ -153,7 +153,6 @@ graph TD
     W --> C[Critic]
     C --> O[Output Report]
 ```
-
 ---
 
 ## 📊 Hardware vs Performance Table
