@@ -12,8 +12,6 @@ import {
   AlertCircle, CheckCircle2, SlidersHorizontal, Download, Bookmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import Link from 'next/link';
 
@@ -103,6 +101,9 @@ export default function Dashboard() {
     const el = document.getElementById('synthesis-report-content');
     if (!el) return;
     try {
+      const { default: html2canvas } = await import('html2canvas');
+      const { default: jsPDF } = await import('jspdf');
+      
       const canvas = await html2canvas(el, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
