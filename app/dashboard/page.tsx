@@ -101,8 +101,11 @@ export default function Dashboard() {
     const el = document.getElementById('synthesis-report-content');
     if (!el) return;
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const { default: jsPDF } = await import('jspdf');
+      // Use variables to bypass strict static analysis in Next.js 16+ Turbopack for Node-specific dependencies
+      const h2c = 'html2canvas';
+      const jsp = 'jspdf';
+      const { default: html2canvas } = await import(/* webpackIgnore: true */ h2c);
+      const { default: jsPDF } = await import(/* webpackIgnore: true */ jsp);
       
       const canvas = await html2canvas(el, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
