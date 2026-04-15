@@ -143,25 +143,22 @@ export default function Dashboard() {
 
       // 3. Inject Content & Force Light Mode Styling
       const contentClone = el.cloneNode(true) as HTMLElement;
-      contentClone.style.backgroundColor = 'transparent';
-      contentClone.style.color = '#000000'; // Pure black text
-      contentClone.style.border = 'none';
-      contentClone.style.boxShadow = 'none';
-      contentClone.style.minHeight = 'auto'; // Remove fixed UI height
-      contentClone.className = "prose max-w-none text-[15px] prose-p:leading-relaxed"; // Force light mode typography
+      contentClone.className = "prose max-w-none text-[15px] prose-p:leading-relaxed"; 
       
-      // Override dark mode text classes
-      const textElements = contentClone.querySelectorAll('*');
-      textElements.forEach(node => {
-         const n = node as HTMLElement;
-         n.style.color = '#000000'; // Force PURE BLACK text override on every element
-         if (n.tagName === 'SPAN' && n.innerHTML.includes('Document')) {
-           n.style.backgroundColor = '#e4e4e7'; // Slightly darker gray for citation tags
-           n.style.color = '#000000';
-           n.style.borderColor = '#000000';
-         }
-      });
-
+      // We must inject a <style> block with !important to completely override Tailwind Dark Mode
+      // Because html2canvas inherits the root <html> dark class
+      const styleBlock = document.createElement('style');
+      styleBlock.innerHTML = `
+        #pdf-stage, #pdf-stage * {
+          color: #000000 !important;
+          -webkit-text-fill-color: #000000 !important;
+        }
+        #pdf-stage span {
+          background-color: #e4e4e7 !important;
+        }
+      `;
+      stage.id = "pdf-stage";
+      stage.appendChild(styleBlock);
       stage.appendChild(contentClone);
       document.body.appendChild(stage);
 
