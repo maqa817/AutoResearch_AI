@@ -35,7 +35,8 @@ Each query flows through **5 specialized autonomous agents**, ensuring high prec
 | **Writer**     | Markdown Synthesis  | Generates human-readable reports with structure & citations                |
 | **Critic**     | Verification        | Scores output quality, rejects hallucinations, ensures factual correctness |
 
-[![Image Alt]([image_url](https://github.com/maqa817/AutoResearch_AI/blob/3454bb0f3e7ee5d9dcfff67c855eaf79a10fdbb0/Screenshot%202026-04-16%20143425.png))](https://github.com/maqa817/AutoResearch_AI/blob/3454bb0f3e7ee5d9dcfff67c855eaf79a10fdbb0/Screenshot%202026-04-16%20143425.png)
+
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/49f10a4cb25a644e8941676e9ad19bcfdc3a60c7/Screenshot%202026-04-16%20143425.png)
 ---
 
 ## 🖥️ System Architecture
