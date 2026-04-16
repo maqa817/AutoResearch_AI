@@ -50,6 +50,7 @@ class SimpleRAGResponse(BaseModel):
     query: str
     answer: str
     chunks_retrieved: int
+    retrieved_context: Optional[List[str]] = None
 
 class FullResearchResponse(BaseModel):
     """Response for full multi-agent research"""
@@ -57,6 +58,7 @@ class FullResearchResponse(BaseModel):
     status: str
     agents_involved: List[str]
     final_report: str
+    retrieved_context: Optional[List[str]] = None
 
 class IndexStatsResponse(BaseModel):
     """Response for index statistics"""
@@ -174,7 +176,8 @@ async def research_query(request: QueryRequest):
                 "mode": "full_orchestration",
                 "finalAnswer": result.get("finalAnswer", ""),
                 "steps": result.get("steps", []),
-                "criticism": result.get("criticism", None)
+                "criticism": result.get("criticism", None),
+                "retrieved_context": result.get("retrieved_context", [])
             }
         else:
             # Simple RAG
@@ -185,7 +188,8 @@ async def research_query(request: QueryRequest):
                 "answer": result["answer"],
                 "chunks_retrieved": result["chunks_retrieved"],
                 "model": result["model"],
-                "mode": "simple_rag"
+                "mode": "simple_rag",
+                "retrieved_context": result.get("retrieved_context", [])
             }
     
     except Exception as e:

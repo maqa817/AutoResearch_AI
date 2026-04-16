@@ -4,15 +4,16 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Loader2, Sparkles, Upload, FileText, 
-  Trash2, BrainCircuit, X, 
+import {
+  Loader2, Sparkles, Upload, FileText,
+  Trash2, BrainCircuit, X,
   Search, ShieldCheck, Cpu, ArrowLeft, ArrowRight,
   AlignLeft, BarChart2, MessageSquare,
   AlertCircle, CheckCircle2, SlidersHorizontal, Download, Bookmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { RetrievedContext } from '@/components/RetrievedContext';
 import Link from 'next/link';
 
 interface AgentStep {
@@ -47,9 +48,10 @@ export default function Dashboard() {
   const [response, setResponse] = useState('');
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [criticism, setCriticism] = useState<CriticReview | null>(null);
-  const [chunks, setChunks] = useState<any[]>([]); 
+  const [chunks, setChunks] = useState<any[]>([]);
   const [error, setError] = useState('');
-  
+  const [retrievedContext, setRetrievedContext] = useState<string[]>([]);
+
   // Settings
   const [useFullOrchestration, setUseFullOrchestration] = useState(true);
   const [useWeb, setUseWeb] = useState(false);
@@ -93,7 +95,7 @@ export default function Dashboard() {
   const purgeSystem = async () => {
     if (confirm('Clear working memory? This will purge the index.')) {
       await fetch('/api/clear-index', { method: 'POST' });
-      setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null); setChunks([]);
+      setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null); setChunks([]); setRetrievedContext([]);
     }
   };
 
@@ -116,17 +118,17 @@ export default function Dashboard() {
 
       const html2canvas = (window as any).html2canvas;
       const jsPDF = (window as any).jspdf.jsPDF;
-      
+
       // 1. Create invisible staging environment for professional PDF styling
       const stage = document.createElement('div');
       stage.style.position = 'absolute';
       stage.style.left = '-9999px';
       stage.style.top = '0';
-      stage.style.width = '800px'; 
+      stage.style.width = '800px';
       stage.style.backgroundColor = '#ffffff';
       stage.style.padding = '50px 60px'; // Professional margins
       stage.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-      
+
       // 2. Build Document Header
       const header = document.createElement('div');
       header.innerHTML = `
@@ -148,17 +150,17 @@ export default function Dashboard() {
       content.style.lineHeight = '1.7';
       content.style.whiteSpace = 'pre-line';
       content.style.fontFamily = 'Arial, sans-serif';
-      
+
       // We convert Markdown newlines and tags manually
       let htmlStr = response.replace(/\n\n/g, '</p><p style="margin-bottom:12px">').replace(/\n(.*)/g, '<br/>$1');
       if (!htmlStr.startsWith('<p>')) htmlStr = '<p>' + htmlStr;
       if (!htmlStr.endsWith('</p>')) htmlStr = htmlStr + '</p>';
-      
+
       // Highlight citations
       htmlStr = htmlStr.replace(/\[(Document \d+)\]/g, '<strong style="background: #f1f1f1; border: 1px solid #ccc; font-size: 12px; padding: 2px 6px; border-radius: 4px; color: #000;">[$1]</strong>');
-      
+
       content.innerHTML = htmlStr;
-      
+
       // Override ANY rogue text elements
       const allEls = content.querySelectorAll('*');
       allEls.forEach(el => { (el as HTMLElement).style.color = '#000000'; });
@@ -170,29 +172,29 @@ export default function Dashboard() {
       const canvas = await html2canvas(stage, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      
+
       let heightLeft = imgHeight;
       let position = 0;
-      
+
       pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
       heightLeft -= pageHeight;
-      
+
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      
+
       pdf.save('AutoResearch_Report.pdf');
 
       // 5. Cleanup DOM
       document.body.removeChild(stage);
-      
+
     } catch (e) {
       console.error('PDF generation failed', e);
     }
@@ -201,8 +203,8 @@ export default function Dashboard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) { setError('Research parameters missing.'); return; }
-    setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null); setChunks([]);
-    
+    setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null); setChunks([]); setRetrievedContext([]);
+
     try {
       let endpoint = '/api/research';
       if (useFullOrchestration) {
@@ -212,23 +214,24 @@ export default function Dashboard() {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query, 
+        body: JSON.stringify({
+          query,
           question: query, // Support Demo parameters
-          use_full_orchestration: useFullOrchestration, 
+          use_full_orchestration: useFullOrchestration,
           useFullOrchestration, // Legacy support
-          use_web: useWeb, 
-          selected_documents: documents.map(d => d.name) 
+          use_web: useWeb,
+          selected_documents: documents.map(d => d.name)
         }),
       });
 
       if (!res.ok) throw new Error('Inference failure. Check backend.');
-      
+
       // If not orchestration or streaming not supported, handle as JSON
       if (!useFullOrchestration || !res.body) {
         const data = await res.json();
         setResponse(data.finalAnswer || data.answer || '');
         if (data.steps) setAgentSteps(data.steps);
+        if (data.retrieved_context) setRetrievedContext(data.retrieved_context);
         setLoading(false);
         return;
       }
@@ -241,10 +244,10 @@ export default function Dashboard() {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; 
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -253,7 +256,7 @@ export default function Dashboard() {
               const { type, data } = payload;
 
               if (type === 'agent_start') {
-                setLoading(false); 
+                setLoading(false);
                 setAgentSteps(prev => [...prev, { agent: data.agent, input: '', output: '', timestamp: new Date().toISOString() }]);
               } else if (type === 'agent_token') {
                 setAgentSteps(prev => {
@@ -270,6 +273,7 @@ export default function Dashboard() {
               } else if (type === 'complete') {
                 setCriticism(data.criticism || null);
                 if (data.chunks) setChunks(data.chunks);
+                if (data.retrieved_context) setRetrievedContext(data.retrieved_context);
               }
             } catch (err) {
               console.error('SSE parse error:', err);
@@ -278,10 +282,10 @@ export default function Dashboard() {
         }
       }
 
-    } catch (err: any) { 
-      setError(err.message || 'Connection lost'); 
-    } finally { 
-      setLoading(false); 
+    } catch (err: any) {
+      setError(err.message || 'Connection lost');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -296,15 +300,15 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans relative">
-      
+
       {/* Settings Modal Overlay */}
       <AnimatePresence>
         {showSettings && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-card w-full max-w-md border border-border rounded-2xl subtle-shadow overflow-hidden flex flex-col"
             >
@@ -364,7 +368,7 @@ export default function Dashboard() {
               <span className="px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[11px] font-bold tracking-wider uppercase">Local Enclave</span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <div className="h-4 w-px bg-border mx-1" />
@@ -380,7 +384,7 @@ export default function Dashboard() {
 
       {/* Main Workspace */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto p-6 md:p-8 lg:p-12 mb-20">
-        
+
         {/* Workspace Title Area */}
         <div className="mb-12 flex justify-between items-end">
           <div>
@@ -390,7 +394,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
+
           {/* Left Column: Form Controls */}
           <div className="lg:col-span-4 space-y-8">
             <div className="space-y-3">
@@ -410,8 +414,8 @@ export default function Dashboard() {
               </div>
               <div className="p-1 rounded-xl bg-card border border-border subtle-shadow">
                 <input ref={fileInputRef} type="file" multiple accept=".pdf,.txt,.md" onChange={handleFileUpload} className="hidden" />
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
                   className="w-full h-14 rounded-lg border border-dashed border-border hover:bg-secondary/50 text-muted-foreground transition-all flex items-center justify-center gap-2"
@@ -424,7 +428,7 @@ export default function Dashboard() {
                   {documents.length > 0 && (
                     <div className="p-2 space-y-2 mt-2 border-t border-border/50">
                       {documents.map((doc, i) => (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                           key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 text-sm overflow-hidden group"
                         >
@@ -444,15 +448,13 @@ export default function Dashboard() {
             </div>
 
             {/* Orchestration Toggle */}
-            <div 
+            <div
               onClick={() => setUseFullOrchestration(!useFullOrchestration)}
-              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${
-                useFullOrchestration ? 'bg-primary/5 border-primary/30' : 'bg-card border-border hover:bg-secondary/50'
-              }`}
+              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${useFullOrchestration ? 'bg-primary/5 border-primary/30' : 'bg-card border-border hover:bg-secondary/50'
+                }`}
             >
-              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${
-                useFullOrchestration ? 'bg-primary border-primary text-primary-foreground' : 'bg-transparent border-border'
-              }`}>
+              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${useFullOrchestration ? 'bg-primary border-primary text-primary-foreground' : 'bg-transparent border-border'
+                }`}>
                 {useFullOrchestration && <CheckCircle2 className="w-3.5 h-3.5" />}
               </div>
               <div>
@@ -462,15 +464,13 @@ export default function Dashboard() {
             </div>
 
             {/* Web Search Toggle */}
-            <div 
+            <div
               onClick={() => setUseWeb(!useWeb)}
-              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${
-                useWeb ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-card border-border hover:bg-secondary/50'
-              }`}
+              className={`p-5 rounded-xl border cursor-pointer transition-all subtle-shadow flex items-start gap-4 ${useWeb ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-card border-border hover:bg-secondary/50'
+                }`}
             >
-              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${
-                useWeb ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-transparent border-border'
-              }`}>
+              <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center border transition-colors ${useWeb ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-transparent border-border'
+                }`}>
                 {useWeb && <CheckCircle2 className="w-3.5 h-3.5" />}
               </div>
               <div>
@@ -479,9 +479,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <Button 
-              onClick={handleSubmit} 
-              disabled={loading} 
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
               className="w-full h-16 rounded-xl text-[16px] font-bold bg-foreground text-background hover:bg-foreground/90 transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-8"
             >
               {loading ? (
@@ -536,13 +536,13 @@ export default function Dashboard() {
                   <div className="prose dark:prose-invert prose-p:leading-relaxed prose-headings:font-bold prose-headings:tracking-tight max-w-none text-[15px] z-10 w-full">
                     {loading && !response ? (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 opacity-60">
-                         {/* We can show the loading state directly inside here too for double immersion */}
+                        {/* We can show the loading state directly inside here too for double immersion */}
                         <div className="w-1/3 h-8 bg-secondary rounded animate-pulse mb-8" />
                         <div className="w-full h-4 bg-secondary rounded animate-pulse" />
                         <div className="w-[95%] h-4 bg-secondary rounded animate-pulse" />
                         <div className="w-[85%] h-4 bg-secondary rounded animate-pulse" />
                         <div className="w-2/3 h-4 bg-secondary rounded animate-pulse" />
-                        
+
                         <div className="mt-16 text-center text-sm font-bold text-primary animate-pulse">
                           {LOADING_MESSAGES[loadingMsgIdx]}
                         </div>
@@ -552,6 +552,11 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
+
+                {/* Render Retrieved Context */}
+                {!loading && response && (
+                  <RetrievedContext contexts={retrievedContext} />
+                )}
               </CardContent>
             </Card>
 
@@ -559,10 +564,9 @@ export default function Dashboard() {
             <AnimatePresence>
               {criticism && (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                  <Card className={`rounded-xl border ${
-                    criticism.quality === 'good' ? 'border-[#34D399]/30 bg-[#34D399]/5' :
+                  <Card className={`rounded-xl border ${criticism.quality === 'good' ? 'border-[#34D399]/30 bg-[#34D399]/5' :
                     criticism.quality === 'fair' ? 'border-[#F59E0B]/30 bg-[#F59E0B]/5' : 'border-destructive/30 bg-destructive/5'
-                  }`}>
+                    }`}>
                     <CardContent className="p-5 flex flex-col md:flex-row gap-6">
                       <div className="flex flex-col gap-2 min-w-[200px]">
                         <span className="text-[10px] uppercase font-bold tracking-widest opacity-60">Verification Layer</span>

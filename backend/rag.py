@@ -8,6 +8,17 @@ import requests
 from embed import retrieve_relevant_chunks, embedding_manager
 from tools import web_search, format_web_results_as_context
 
+def format_retrieved_context(chunks: List[Dict]) -> List[str]:
+    formatted = []
+    if not chunks: return formatted
+    for chunk in chunks[:3]:
+        text = chunk.get("text", "")
+        clean_text = " ".join(text.split())
+        if len(clean_text) > 200:
+            clean_text = clean_text[:200] + "..."
+        formatted.append(clean_text)
+    return formatted
+
 class RAGPipeline:
     """
     RAG Pipeline that:
@@ -47,7 +58,6 @@ class RAGPipeline:
             context += f"{chunk['text']}\n\n" 
         
         return context, chunks
-        return context
     
     def _build_prompt(self, query: str, context: str) -> str:
         """
@@ -142,6 +152,7 @@ ANSWER:"""
             "context_used": full_context,
             "local_context": local_context,
             "web_context": web_context,
+            "retrieved_context": format_retrieved_context(chunks),
             "model": self.model,
             "chunks_retrieved": self.chunk_count,
             "web_results_used": use_web
@@ -181,9 +192,9 @@ Return as a numbered list."""
         plan_text = self.rag._call_ollama(planner_prompt)
         return plan_text.split('\n') if plan_text else []
     
-    def conduct_research(self, query: str, doc_ids: List[str] = None, use_web: bool = False) -> str:
+    def conduct_research(self, query: str, doc_ids: List[str] = None, use_web: bool = False) -> Dict:
         """Researcher: Find relevant information in specific files and optionally the web"""
-        return self.rag.generate(query, doc_ids=doc_ids, use_web=use_web)["answer"]
+        return self.rag.generate(query, doc_ids=doc_ids, use_web=use_web)
     
     def analyze_findings(self, findings: str) -> str:
         """Analyst: Synthesize and identify patterns"""
@@ -237,7 +248,9 @@ Is it good, fair, or poor?"""
         
         # Step 2: Research
         print(f"2. RESEARCHER AGENT (Targeting {doc_ids}, Web: {use_web})...")
-        research_str = self.conduct_research(query, doc_ids=doc_ids, use_web=use_web)
+        research_res = self.conduct_research(query, doc_ids=doc_ids, use_web=use_web)
+        research_str = research_res["answer"]
+        retrieved_context = research_res.get("retrieved_context", [])
         steps.append({
             "agent": "Researcher",
             "input": plan_text,
@@ -294,7 +307,8 @@ Is it good, fair, or poor?"""
             "finalAnswer": finalAnswer, 
             "status": "completed",
             "steps": steps,             
-            "criticism": criticism      
+            "criticism": criticism,
+            "retrieved_context": retrieved_context
         }
 
     def orchestrate_full_research_stream(self, query: str, doc_ids: List[str] = None, use_web: bool = False):
@@ -404,7 +418,8 @@ New Answer (Do not output anything besides the new answer text):"""
         yield format_event("complete", {
             "finalAnswer": final_report_str,
             "criticism": criticism_data,
-            "chunks": raw_chunks
+            "chunks": raw_chunks,
+            "retrieved_context": format_retrieved_context(raw_chunks)
         })
 
 
