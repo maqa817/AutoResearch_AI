@@ -4,8 +4,13 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
+interface RetrievedChunk {
+  text: string;
+  source: string;
+}
+
 interface RetrievedContextProps {
-  contexts: string[];
+  contexts: RetrievedChunk[];
 }
 
 export function RetrievedContext({ contexts }: RetrievedContextProps) {
@@ -55,12 +60,12 @@ export function RetrievedContext({ contexts }: RetrievedContextProps) {
                 >
                   <div className="flex items-center gap-2 mb-2 text-primary opacity-80 group-hover:opacity-100 transition-opacity">
                     <FileText className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Source {idx + 1}
+                    <span className="text-xs font-bold uppercase tracking-wider truncate max-w-[250px]">
+                      {ctx.source || `Source ${idx + 1}`}
                     </span>
                   </div>
                   <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                    "{ctx}"
+                    "{ctx.text}"
                   </p>
                 </div>
               ))}

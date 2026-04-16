@@ -50,7 +50,7 @@ class SimpleRAGResponse(BaseModel):
     query: str
     answer: str
     chunks_retrieved: int
-    retrieved_context: Optional[List[str]] = None
+    retrieved_context: Optional[List[Dict]] = None
 
 class FullResearchResponse(BaseModel):
     """Response for full multi-agent research"""
@@ -58,7 +58,7 @@ class FullResearchResponse(BaseModel):
     status: str
     agents_involved: List[str]
     final_report: str
-    retrieved_context: Optional[List[str]] = None
+    retrieved_context: Optional[List[Dict]] = None
 
 class IndexStatsResponse(BaseModel):
     """Response for index statistics"""

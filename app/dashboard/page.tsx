@@ -50,7 +50,7 @@ export default function Dashboard() {
   const [criticism, setCriticism] = useState<CriticReview | null>(null);
   const [chunks, setChunks] = useState<any[]>([]);
   const [error, setError] = useState('');
-  const [retrievedContext, setRetrievedContext] = useState<string[]>([]);
+  const [retrievedContext, setRetrievedContext] = useState<any[]>([]);
 
   // Settings
   const [useFullOrchestration, setUseFullOrchestration] = useState(true);

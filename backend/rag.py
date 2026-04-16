@@ -8,7 +8,7 @@ import requests
 from embed import retrieve_relevant_chunks, embedding_manager
 from tools import web_search, format_web_results_as_context
 
-def format_retrieved_context(chunks: List[Dict]) -> List[str]:
+def format_retrieved_context(chunks: List[Dict]) -> List[Dict]:
     formatted = []
     if not chunks: return formatted
     for chunk in chunks[:3]:
@@ -16,7 +16,10 @@ def format_retrieved_context(chunks: List[Dict]) -> List[str]:
         clean_text = " ".join(text.split())
         if len(clean_text) > 200:
             clean_text = clean_text[:200] + "..."
-        formatted.append(clean_text)
+        formatted.append({
+            "text": clean_text,
+            "source": chunk.get("doc_id", "Unknown Source")
+        })
     return formatted
 
 class RAGPipeline:
