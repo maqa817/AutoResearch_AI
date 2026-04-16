@@ -20,7 +20,7 @@
 **AutoResearch AI** is a professional-grade, fully local multi-agent system designed for researchers, security-conscious professionals, and enterprises. It handles **document ingestion, semantic indexing, query orchestration, report generation, and verification** while guaranteeing **zero data leakage**.You can review the frontend part (because Ollama is running locally and I don’t have any paid partnership with hosting websites) at https://autoresearchai.vercel.app/ .
 
 > Built to combine the high-performance aspects of Mistral and Llama models with GPU acceleration and robust agent collaboration.
-
+https://github.com/maqa817/AutoResearch_AI/blob/main/Screenshot%202026-04-16%20132856.jpg?raw=true
 ---
 
 ## 🚀 Multi-Agent Pipeline
