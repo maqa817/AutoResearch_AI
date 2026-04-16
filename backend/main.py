@@ -129,7 +129,7 @@ async def upload_document(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Only .txt and .pdf files supported")
         
         # Embed and add to index
-        doc_id = file.filename.replace('.', '_').replace('/', '_')
+        doc_id = file.filename
         chunks_added = embed_and_add_document(
             text_content,
             doc_id,
