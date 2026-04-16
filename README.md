@@ -131,6 +131,9 @@ Visit: `http://localhost:3000`
 * **Strict Context Control**: Absolute document filtering ensures the AI only accesses files you explicitly select for each query.
 * **Hardware acceleration**: Deep integration with NVIDIA RTX GPUs via Ollama and PyTorch (CUDA).
 * **Fully air-gapped**: Zero external data transmission for 100% privacy.
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/47fe33814678b4bbfbaaca3c0e38c9b14c2f464b/Screenshot%202026-04-16%20143416.png)
+
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/47fe33814678b4bbfbaaca3c0e38c9b14c2f464b/Screenshot%202026-04-16%20143354.png)
 
 ---
 
