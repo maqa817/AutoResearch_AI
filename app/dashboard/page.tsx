@@ -9,7 +9,7 @@ import {
   Trash2, BrainCircuit, X,
   Search, ShieldCheck, Cpu, ArrowLeft, ArrowRight,
   AlignLeft, BarChart2, MessageSquare,
-  AlertCircle, CheckCircle2, SlidersHorizontal, Download, Bookmark
+  AlertCircle, CheckCircle2, SlidersHorizontal, Download, Bookmark, Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -59,6 +59,11 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Vision State
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
@@ -92,10 +97,25 @@ export default function Dashboard() {
 
   const removeDocument = (index: number) => setDocuments(documents.filter((_, i) => i !== index));
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImage(file);
+      const url = URL.createObjectURL(file);
+      setImagePreview(url);
+    }
+  };
+  
+  const removeImage = () => {
+    setImage(null);
+    setImagePreview(null);
+  };
+
   const purgeSystem = async () => {
     if (confirm('Clear working memory? This will purge the index.')) {
       await fetch('/api/clear-index', { method: 'POST' });
       setDocuments([]); setResponse(''); setAgentSteps([]); setError(''); setCriticism(null); setChunks([]); setRetrievedContext([]);
+      removeImage();
     }
   };
 
@@ -202,8 +222,34 @@ export default function Dashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) { setError('Research parameters missing.'); return; }
+    if (!query.trim() && !image) { setError('Research parameters or Image missing.'); return; }
     setLoading(true); setError(''); setResponse(''); setAgentSteps([]); setCriticism(null); setChunks([]); setRetrievedContext([]);
+
+    if (image) {
+      const formData = new FormData();
+      formData.append('file', image);
+      if (query.trim()) {
+        formData.append('query', query);
+      }
+      
+      try {
+        const res = await fetch('/api/analyze-image', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) throw new Error('Vision analysis failed');
+        const data = await res.json();
+        setResponse(data.explanation || '');
+        if (data.structured_data) {
+          setRetrievedContext([{ doc_id: 'Vision Model (Structured)', text: JSON.stringify(data.structured_data, null, 2), similarity_score: 1 }]);
+        }
+      } catch (err: any) {
+        setError(err.message || 'Vision connection lost');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       let endpoint = '/api/research';
@@ -444,6 +490,43 @@ export default function Dashboard() {
                     </div>
                   )}
                 </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Vision Upload */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-bold tracking-tight uppercase text-muted-foreground">Vision Analysis</label>
+                {image && <span className="text-xs bg-secondary px-2 rounded-full font-medium">1 Image</span>}
+              </div>
+              <div className="p-1 rounded-xl bg-card border border-border subtle-shadow">
+                <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                
+                {!image ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="w-full h-14 rounded-lg border border-dashed border-border hover:bg-secondary/50 text-muted-foreground transition-all flex items-center justify-center gap-2"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                    Upload Image for Vision AI
+                  </Button>
+                ) : (
+                  <div className="p-2 space-y-2 mt-1">
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 text-sm overflow-hidden group border border-border/50"
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        {imagePreview && <img src={imagePreview} alt="preview" className="w-10 h-10 rounded object-cover border border-border" />}
+                        <span className="truncate font-medium">{image.name}</span>
+                      </div>
+                      <button onClick={removeImage} className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-all">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
               </div>
             </div>
 

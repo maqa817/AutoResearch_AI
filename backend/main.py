@@ -3,7 +3,7 @@ AutoResearch AI Backend - Version 2
 RAG-powered multi-agent research system with semantic retrieval
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,6 +12,11 @@ import uvicorn
 import logging
 from pathlib import Path
 import PyPDF2
+import io
+import json
+import requests
+from PIL import Image
+from transformers import BlipProcessor, BlipForQuestionAnswering
 
 # Import RAG and embedding modules
 from embed import embed_and_add_document, get_embedding_stats, embedding_manager
@@ -26,6 +31,21 @@ app = FastAPI(
     description="RAG-powered Multi-Agent Research & Analysis System",
     version="2.0.0"
 )
+
+# ==========================================
+# INITIALIZE VISION MODEL
+# ==========================================
+logger.info("Loading BLIP Vision Model...")
+try:
+    processor = BlipProcessor.from_pretrained("Salesforce/blip-vqa-base")
+    vision_model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
+    logger.info("Vision Model loaded successfully.")
+except Exception as e:
+    logger.error(f"Failed to load Vision Model: {e}")
+    processor = None
+    vision_model = None
+
+OLLAMA_API_URL = "http://localhost:11434/api/generate"
 
 # Add CORS middleware
 app.add_middleware(
@@ -228,6 +248,92 @@ async def batch_research(queries: List[str]):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============== Vision API Endpoint ==============
+
+def ask_blip(image: Image.Image, question: str) -> str:
+    """Queries the BLIP VQA model with a specific question about the image"""
+    if not processor or not vision_model:
+        return "Model not loaded"
+    inputs = processor(image, question, return_tensors="pt")
+    out = vision_model.generate(**inputs)
+    return processor.decode(out[0], skip_special_tokens=True)
+
+@app.post("/api/analyze-image")
+async def analyze_image(file: UploadFile = File(...), query: Optional[str] = Form(None)):
+    """
+    Accepts an image, processes with BLIP to get JSON structure, 
+    and uses Mistral via Ollama to generate a natural explanation.
+    If a query is provided, answers the specific user question.
+    """
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        
+        # Always get a base description
+        scene = ask_blip(image, "what is this an image of?")
+        
+        structured_data = {
+            "scene": scene,
+        }
+        
+        if query:
+            # Ask the vision model the EXACT question the user asked for precise details
+            direct_visual_answer = ask_blip(image, query)
+            structured_data["visual_answer_to_query"] = direct_visual_answer
+            
+            prompt = (
+                f"User uploaded an image and asked this question: '{query}'\n\n"
+                f"Here is the precise data extracted directly from the image by the vision model:\n"
+                f"{json.dumps(structured_data, indent=2)}\n\n"
+                f"Now, provide a highly precise, accurate, and exact answer to the user's question based strictly on the 'visual_answer_to_query' and 'scene'. Do not hallucinate."
+            )
+        else:
+            # Fallback to general details if no specific question
+            objects_str = ask_blip(image, "what objects are in the image?")
+            time_of_day = ask_blip(image, "is it day or night?")
+            weather = ask_blip(image, "what is the weather like?")
+            
+            structured_data.update({
+                "objects": [obj.strip() for obj in objects_str.split(",") if obj.strip()],
+                "attributes": {
+                    "time": time_of_day,
+                    "weather": weather
+                }
+            })
+            
+            prompt = (
+                f"User uploaded an image. Here is the structured description:\n"
+                f"{json.dumps(structured_data, indent=2)}\n\n"
+                f"Now explain the image in a natural, helpful way."
+            )
+        
+        try:
+            response = requests.post(
+                OLLAMA_API_URL,
+                json={
+                    "model": "mistral",
+                    "prompt": prompt,
+                    "stream": False
+                },
+                timeout=30
+            )
+            if response.status_code == 200:
+                mistral_response = response.json().get("response", "")
+            else:
+                mistral_response = f"Error from Ollama: {response.text}"
+        except Exception as ollama_err:
+            mistral_response = f"Failed to connect to Ollama: {str(ollama_err)}"
+            
+        return {
+            "status": "success",
+            "structured_data": structured_data,
+            "explanation": mistral_response
+        }
+        
+    except Exception as e:
+        logger.error(f"Image analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(e)}")
 
 # ============== Index Management ==============
 
