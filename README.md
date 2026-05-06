@@ -20,7 +20,7 @@
 **AutoResearch AI** is a professional-grade, fully local multi-agent system designed for researchers, security-conscious professionals, and enterprises. It handles **document ingestion, semantic indexing, query orchestration, report generation, and verification** while guaranteeing **zero data leakage**.You can review the frontend part (because Ollama is running locally and I don’t have any paid partnership with hosting websites) at https://autoresearchai.vercel.app/ .
 
 > Built to combine the high-performance aspects of Mistral and Llama models with GPU acceleration and robust agent collaboration.
-
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/d3f98f4548ec3f992d5d7616badb604bfc754f1b/Screenshot%202026-04-16%20132856.jpg)
 ---
 
 ## 🚀 Multi-Agent Pipeline
@@ -35,6 +35,8 @@ Each query flows through **5 specialized autonomous agents**, ensuring high prec
 | **Writer**     | Markdown Synthesis  | Generates human-readable reports with structure & citations                |
 | **Critic**     | Verification        | Scores output quality, rejects hallucinations, ensures factual correctness |
 
+
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/49f10a4cb25a644e8941676e9ad19bcfdc3a60c7/Screenshot%202026-04-16%20143425.png)
 ---
 
 ## 🖥️ System Architecture
@@ -129,6 +131,9 @@ Visit: `http://localhost:3000`
 * **Strict Context Control**: Absolute document filtering ensures the AI only accesses files you explicitly select for each query.
 * **Hardware acceleration**: Deep integration with NVIDIA RTX GPUs via Ollama and PyTorch (CUDA).
 * **Fully air-gapped**: Zero external data transmission for 100% privacy.
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/47fe33814678b4bbfbaaca3c0e38c9b14c2f464b/Screenshot%202026-04-16%20143416.png)
+
+![Image Alt](https://github.com/maqa817/AutoResearch_AI/blob/47fe33814678b4bbfbaaca3c0e38c9b14c2f464b/Screenshot%202026-04-16%20143354.png)
 
 ---
 
